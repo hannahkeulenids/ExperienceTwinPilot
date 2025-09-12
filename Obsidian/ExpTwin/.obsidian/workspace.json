@@ -55,12 +55,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Experience Twin to do.md",
+                "file": "Experience Twin.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Experience Twin to do"
+              "title": "Experience Twin"
             }
           },
           {
@@ -242,9 +242,10 @@
   },
   "active": "beba14476a8890dc",
   "lastOpenFiles": [
-    "Experience Twin.md",
-    "Welcome.md",
     "Experience Twin to do.md",
-    "Notities.md"
+    "Welcome.md",
+    "To Buy.md",
+    "Notities.md",
+    "Experience Twin.md"
   ]
 }
