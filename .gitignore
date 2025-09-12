@@ -1,0 +1,44 @@
+# --- Unity ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+UserSettings/
+# Old Collaborate package
+Packages/com.unity.collab-proxy/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+*.user
+*.userprefs
+*.suo
+*.pidb
+*.booproj
+*.svd
+# Rider / JetBrains
+.idea/
+*.sln.DotSettings
+
+# --- Android / Gradle ---
+.gradle/
+*/gradleOut/
+*.apk
+*.aab
+
+# --- iOS / Xcode (if used) ---
+DerivedData/
+*.xcworkspace/
+*.xcodeproj/
+*.xcuserstate/
+
+# --- Misc ---
+# Builds/archives
+*.zip
+*.7z
+*.tar
