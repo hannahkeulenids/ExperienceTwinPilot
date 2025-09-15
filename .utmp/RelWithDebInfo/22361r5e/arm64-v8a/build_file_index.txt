@@ -1,0 +1,2 @@
+C:\Users\hke06\ExperienceTwin_pilot\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\CMakeLists.txt
+C:\Users\hke06\ExperienceTwin_pilot\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\GameActivity\CMakeLists.txt
