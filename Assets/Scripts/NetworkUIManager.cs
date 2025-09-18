@@ -31,5 +31,18 @@ namespace XRMultiplayer
                 Debug.Log("Stopped connection");
             }
         }
+
+        public void StartHostLan()
+        {
+            XRMultiplayer.XRINetworkGameManager.Instance.HostLocalConnection();
+            Debug.Log()
+        }
+
+        public void StartClientLan(string hostIp)
+        {
+            var utp = NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            utp.SetConnectionData(hostIp, utp.ConnectionData.Port);
+            XRMultiplayer.XRINetworkGameManager.Instance.JoinLocalConnection();
+        }
     }
 }
