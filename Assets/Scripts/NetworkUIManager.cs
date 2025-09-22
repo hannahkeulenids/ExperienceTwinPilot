@@ -35,7 +35,7 @@ namespace XRMultiplayer
         public void StartHostLan()
         {
             XRMultiplayer.XRINetworkGameManager.Instance.HostLocalConnection();
-            Debug.Log()
+            
         }
 
         public void StartClientLan(string hostIp)
