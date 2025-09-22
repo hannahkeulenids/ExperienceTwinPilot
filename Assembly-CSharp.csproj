@@ -64,6 +64,7 @@
     <Compile Include="Assets\Scripts\SaveSystem.cs" />
     <Compile Include="Assets\Scripts\NetworkUIManager.cs" />
     <Compile Include="Assets\Scripts\BuildManager.cs" />
+    <Compile Include="Assets\Scripts\PrefabCatalog.cs" />
     <Compile Include="Assets\Scripts\JsonManager.cs" />
   </ItemGroup>
   <ItemGroup>

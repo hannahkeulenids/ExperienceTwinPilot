@@ -1,13 +1,14 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Unity.Netcode;
 
 [System.Serializable]
 public class PlaceableData
 {
     public string prefabName; // of ander ID// of prefab locatie in assets?
-    public Vector3 position;
-    public Quaternion rotation;
-    public Vector3 scale;
+    public Vector3 localPosition;
+    public Quaternion localRotation;
+    public Vector3 localScale;
 }
 
 [System.Serializable]
@@ -42,9 +43,9 @@ public class JsonManager : MonoBehaviour
             var pd = new PlaceableData
             {
                 prefabName = child.gameObject.name.Replace("(Clone)", ""),
-                position = child.position,
-                rotation = child.rotation,
-                scale = child.localScale
+                localPosition = child.localPosition,
+                localRotation = child.localRotation,
+                localScale = child.localScale
             };
             data.placeables.Add(pd);
         }
@@ -53,22 +54,53 @@ public class JsonManager : MonoBehaviour
 
 
     }
-    public void LoadFromString(string json, Transform buildRoot, Dictionary<string, GameObject> prefabLookup)
+    public void LoadFromString(Transform buildRoot, string json, Dictionary<string, GameObject> prefabRegistry)
     {
-        BuildData data = JsonUtility.FromJson<BuildData>(json);
+        var data = JsonUtility.FromJson<BuildData>(json);
+        if (data == null) { Debug.LogError("[JsonManager] Parse fail"); return; }
+        if (buildRoot == null) { Debug.LogError("[JsonManager] buildRoot null"); return; }
+        if (prefabRegistry == null) { Debug.LogError("[JsonManager] prefabRegistry null"); return; }
 
+        Debug.Log($"[JsonManager] Loading build '{data.buildName}', items: {data.placeables?.Count ?? -1}");
+        Debug.Log($"[JsonManager] Registry keys: {string.Join(", ", prefabRegistry.Keys)}");
+
+        int spawned = 0, missing = 0;
         foreach (var pd in data.placeables)
         {
-            if (prefabLookup.TryGetValue(pd.prefabName, out var prefab))
+            if (pd == null) continue;
+
+            if (!prefabRegistry.TryGetValue(pd.prefabName, out var prefab) || prefab == null)
             {
-                GameObject go = Instantiate(prefab, pd.position, pd.rotation, buildRoot);
-                go.transform.localScale = pd.scale;
+                Debug.LogWarning($"[JsonManager] Missing prefab in registry: '{pd.prefabName}'");
+                missing++;
+                continue;
             }
-            else
+
+            var go = Instantiate(prefab, buildRoot);
+            var t = go.transform;
+            t.SetLocalPositionAndRotation(pd.localPosition, pd.localRotation);
+            t.localScale = pd.localScale;
+            go.SetActive(true);
+
+            // Netcode spawn (alleen op server)
+            var netObj = go.GetComponent<Unity.Netcode.NetworkObject>();
+            if (netObj != null)
             {
-                Debug.LogWarning($"Prefab {pd.prefabName} not found in lookup.");
+                if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                {
+                    netObj.Spawn(true);
+                }
+                else
+                {
+                    Debug.LogWarning($"[JsonManager] Not server; skipping Spawn for '{pd.prefabName}'");
+                }
             }
+
+            spawned++;
         }
+
+        Debug.Log($"[JsonManager] Done. Spawned: {spawned}, MissingPrefabs: {missing}");
     }
+
 
 }

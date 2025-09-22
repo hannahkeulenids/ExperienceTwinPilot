@@ -1,18 +1,38 @@
 ﻿using UnityEngine;
 using Unity.Netcode;
+using System.Collections.Generic;
 
 public class BuildManager : NetworkBehaviour
 {
+
+
     [Header("Parent for all objects build with")]
     [SerializeField] Transform buildRoot;
-    
+
     JsonManager _json;
     //is onderstaande nodig? zit gwn buildroot op object?
     private NetworkObject buildRootNO;
 
+    //[SerializeField] private List<GameObject> placeablePrefabs;
+    //private Dictionary<string, GameObject> prefabRegistry;
+
+    [SerializeField] private PrefabCatalog prefabCatalog;
+    private Dictionary<string, GameObject> prefabRegistry;
+
 
     void Awake()
     {
+
+        prefabRegistry = new Dictionary<string, GameObject>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var p in prefabCatalog.prefabs)
+            if (p != null) prefabRegistry[p.name] = p;
+
+        //prefabRegistry = new Dictionary<string, GameObject>();
+       // foreach (var prefab in placeablePrefabs)
+       // {
+        //    prefabRegistry[prefab.name] = prefab;
+       // }
+
         _json = GetComponent<JsonManager>();
         if (buildRoot != null)
             buildRootNO = buildRoot.GetComponent<NetworkObject>();
@@ -95,6 +115,40 @@ public class BuildManager : NetworkBehaviour
         Debug.Log("[BuildManager] Server reparent done.");
 
 
+    }
+    //------ load button -------------
+    public void LoadBuildButton(string buildName)
+    {
+        //LoadBuildButton("MyBuild"); //default name of build
+        if (IsServer) LoadBuild_Server(buildName);
+        else LoadBuild_ServerRpc(buildName);
+    }
+
+
+    [ServerRpc(RequireOwnership = false)]
+    private void LoadBuild_ServerRpc(string buildName)
+    {
+        LoadBuild_Server(buildName);
+    }
+
+    private void LoadBuild_Server(string buildName)
+    {
+        string json = SaveSystem.LoadJson(buildName);
+        if (string.IsNullOrEmpty(json))
+        {
+            Debug.LogWarning($"[BuildManager] No JSON found for build '{buildName}'");
+            return;
+        }
+
+        if (_json != null && buildRoot != null)
+        {
+            _json.LoadFromString(buildRoot, json, prefabRegistry);
+            Debug.Log($"[BuildManager] Loaded build '{buildName}'");
+        }
+        else
+        {
+            Debug.LogError("[BuildManager] Missing JsonManager or buildRoot.");
+        }
 
     }
 
