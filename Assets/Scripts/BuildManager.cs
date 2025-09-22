@@ -3,38 +3,59 @@ using Unity.Netcode;
 
 public class BuildManager : NetworkBehaviour
 {
-    [Header("Parent voor alle gebouwde objecten")]
-    public Transform buildRoot;                  // wijs deze in Inspector
+    [Header("Parent for all objects build with")]
+    [SerializeField] Transform buildRoot;
+    
+    JsonManager _json;
+    //is onderstaande nodig? zit gwn buildroot op object?
     private NetworkObject buildRootNO;
+
 
     void Awake()
     {
+        _json = GetComponent<JsonManager>();
         if (buildRoot != null)
             buildRootNO = buildRoot.GetComponent<NetworkObject>();
     }
 
     // ===== Button handler =====
-    public void FixAllPlaceablesButton()
+    public void FixAndSaveButton(string buildName = "MyBuild")
     {
         Debug.Log($"FixAllPlaceablesButton pressed. IsServer={IsServer} IsClient={IsClient}");
 
         if (IsServer)
         {
-            FixAllPlaceables_Server();           // host/server voert direct uit
+            FixAndSave_Server(buildName);           // host/server voert direct uit
         }
         else
         {
-            FixAllPlaceables_ServerRpc();        // clients vragen het de server
+            FixAndSave_ServerRpc(buildName);        // clients vragen het de server
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void FixAllPlaceables_ServerRpc()
+    private void FixAndSave_ServerRpc(string buildName)
     {
-        FixAllPlaceables_Server();
+        FixAndSave_Server(buildName);
     }
 
     // ===== Server only: de echte reparent =====
+    void FixAndSave_Server(string buildName)
+    {
+        FixAllPlaceables_Server();
+
+        if (_json == null || buildRoot == null)
+        {
+            Debug.LogWarning("[BuildManager] JsonManager of buildRoot mist.");
+            return;
+        }
+
+        string json = _json.SaveToString(buildRoot, buildName);
+        SaveSystem.SaveJson(buildName, json); //bestand weg schrijven via savesystem
+
+        Debug.Log($"[BuildManager] Saved '{buildName}' ({json.Length} chars)");
+        // Optioneel: File.WriteAllText(Application.persistentDataPath + $"/{buildName}.json", json);
+    }
     private void FixAllPlaceables_Server()
     {
         if (buildRoot == null)
@@ -43,6 +64,7 @@ public class BuildManager : NetworkBehaviour
             return;
         }
 
+        //enomerator van makne?
         var placeables = GameObject.FindGameObjectsWithTag("Placeable");
         Debug.Log($"[BuildManager] Server fixing {placeables.Length} placeables…");
 
@@ -71,5 +93,9 @@ public class BuildManager : NetworkBehaviour
         }
 
         Debug.Log("[BuildManager] Server reparent done.");
+
+
+
     }
+
 }
