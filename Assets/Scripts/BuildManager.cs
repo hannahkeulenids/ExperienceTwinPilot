@@ -6,18 +6,19 @@ public class BuildManager : NetworkBehaviour
 {
 
 
-    [Header("Parent for all objects build with")]
+    [Header("Parent of objects build with")]
     [SerializeField] Transform buildRoot;
 
-    JsonManager _json;
-    //is onderstaande nodig? zit gwn buildroot op object?
-    private NetworkObject buildRootNO;
-
-    //[SerializeField] private List<GameObject> placeablePrefabs;
-    //private Dictionary<string, GameObject> prefabRegistry;
-
+    [Header("Catalog")]
     [SerializeField] private PrefabCatalog prefabCatalog;
     private Dictionary<string, GameObject> prefabRegistry;
+
+    JsonManager _json;
+
+    //is onderstaande nodig? 
+    private NetworkObject buildRootNO;
+
+    
 
 
     void Awake()
@@ -27,13 +28,9 @@ public class BuildManager : NetworkBehaviour
         foreach (var p in prefabCatalog.prefabs)
             if (p != null) prefabRegistry[p.name] = p;
 
-        //prefabRegistry = new Dictionary<string, GameObject>();
-       // foreach (var prefab in placeablePrefabs)
-       // {
-        //    prefabRegistry[prefab.name] = prefab;
-       // }
-
         _json = GetComponent<JsonManager>();
+
+        //moet wel een networkobject zijn 
         if (buildRoot != null)
             buildRootNO = buildRoot.GetComponent<NetworkObject>();
     }
@@ -62,20 +59,69 @@ public class BuildManager : NetworkBehaviour
     // ===== Server only: de echte reparent =====
     void FixAndSave_Server(string buildName)
     {
+        // alle placeables als child onder buildroot zetten
         FixAllPlaceables_Server();
-
+       
         if (_json == null || buildRoot == null)
         {
             Debug.LogWarning("[BuildManager] JsonManager of buildRoot mist.");
             return;
         }
 
+        // serialize wegschrijven
         string json = _json.SaveToString(buildRoot, buildName);
+
+        if (string.IsNullOrEmpty(json)) 
+        { 
+            Debug.LogError("[BuildManager] Save JSON empty.");
+            return; 
+        }
+
         SaveSystem.SaveJson(buildName, json); //bestand weg schrijven via savesystem
 
         Debug.Log($"[BuildManager] Saved '{buildName}' ({json.Length} chars)");
         // Optioneel: File.WriteAllText(Application.persistentDataPath + $"/{buildName}.json", json);
     }
+
+    public void LoadLatestBuildButton()
+    {
+        if (IsServer)
+        {
+            LoadLatestBuild_Server();
+        }
+
+        else LoadLatestBuild_ServerRpc();
+        
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void LoadLatestBuild_ServerRpc()
+    {
+        LoadLatestBuild_Server();
+    }
+
+    private void LoadLatestBuild_Server()
+    {
+        if (prefabCatalog == null)
+        {
+            Debug.LogError("[BuildManager] PrefabCatalog not assigned.");
+            return;
+        }
+
+        string latestName;
+        string json = SaveSystem.LoadLatestJson(out latestName);
+        if (string.IsNullOrEmpty(json))
+        {
+            Debug.LogWarning("[BuildManager] No latest save found.");
+            return;
+        }
+
+        // Important: JsonManager first erases the existing files (clearExisting = true)
+        _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
+        Debug.Log($"[BuildManager] Loaded latest build '{latestName}'");
+    }
+
+
     private void FixAllPlaceables_Server()
     {
         if (buildRoot == null)
@@ -133,7 +179,8 @@ public class BuildManager : NetworkBehaviour
 
     private void LoadBuild_Server(string buildName)
     {
-        string json = SaveSystem.LoadJson(buildName);
+        string LatestName;
+        string json = SaveSystem.LoadLatestJson(out LatestName);
         if (string.IsNullOrEmpty(json))
         {
             Debug.LogWarning($"[BuildManager] No JSON found for build '{buildName}'");
@@ -142,13 +189,16 @@ public class BuildManager : NetworkBehaviour
 
         if (_json != null && buildRoot != null)
         {
-            _json.LoadFromString(buildRoot, json, prefabRegistry);
+            //_json.LoadFromString(buildRoot, json, prefabRegistry);
+            _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
             Debug.Log($"[BuildManager] Loaded build '{buildName}'");
         }
         else
         {
             Debug.LogError("[BuildManager] Missing JsonManager or buildRoot.");
         }
+
+        
 
     }
 

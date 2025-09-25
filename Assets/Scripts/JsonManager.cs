@@ -1,11 +1,12 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
 using Unity.Netcode;
 
+// ---- data classes ----
 [System.Serializable]
 public class PlaceableData
 {
-    public string prefabName; // of ander ID// of prefab locatie in assets?
+    public string prefabKey;           // prefabId (als aanwezig) anders prefab.name
     public Vector3 localPosition;
     public Quaternion localRotation;
     public Vector3 localScale;
@@ -20,58 +21,66 @@ public class BuildData
 
 public class JsonManager : MonoBehaviour
 {
-
-    //[SerializeField] Transform buildRoot;
-    //of moet ik buildroot uit ander script halen?
-
-    //haal alles op onder rootbuild. Alle objecten + transform
-    //naam geven aan saved build nog toevoegen?
+    // --- SAVE ---
     public string SaveToString(Transform buildRoot, string buildName)
     {
-
-        if(buildRoot == null)
+        if (buildRoot == null)
         {
-            Debug.Log("[JsonManager] buildRoot is null in SaveToString.");
+            Debug.LogError("[JsonManager] buildRoot is null in SaveToString.");
             return string.Empty;
         }
 
         var data = new BuildData { buildName = buildName };
 
-
         foreach (Transform child in buildRoot)
         {
-            var pd = new PlaceableData
+            string key = GetPrefabKey(child.gameObject);
+
+            data.placeables.Add(new PlaceableData
             {
-                prefabName = child.gameObject.name.Replace("(Clone)", ""),
+                prefabKey = key,
                 localPosition = child.localPosition,
                 localRotation = child.localRotation,
                 localScale = child.localScale
-            };
-            data.placeables.Add(pd);
+            });
         }
 
         return JsonUtility.ToJson(data, true);
-
-
     }
-    public void LoadFromString(Transform buildRoot, string json, Dictionary<string, GameObject> prefabRegistry)
+
+    // --- LOAD (auto-lookup from PrefabCatalog) ---
+    public void LoadFromString(Transform buildRoot, string json, PrefabCatalog catalog, bool clearExisting = true)
     {
+        if (buildRoot == null) { Debug.LogError("[JsonManager] buildRoot is null."); return; }
+        if (catalog == null) { Debug.LogError("[JsonManager] PrefabCatalog is null."); return; }
+
         var data = JsonUtility.FromJson<BuildData>(json);
-        if (data == null) { Debug.LogError("[JsonManager] Parse fail"); return; }
-        if (buildRoot == null) { Debug.LogError("[JsonManager] buildRoot null"); return; }
-        if (prefabRegistry == null) { Debug.LogError("[JsonManager] prefabRegistry null"); return; }
+        if (data == null) { Debug.LogError("[JsonManager] Could not parse JSON."); return; }
 
-        Debug.Log($"[JsonManager] Loading build '{data.buildName}', items: {data.placeables?.Count ?? -1}");
-        Debug.Log($"[JsonManager] Registry keys: {string.Join(", ", prefabRegistry.Keys)}");
+        // 1) Build lookup (key -> prefab); key = Placeable.PrefabId or prefab.name
+        var lookup = new Dictionary<string, GameObject>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var prefab in catalog.prefabs)
+        {
+            if (prefab == null) continue;
+            var p = prefab.GetComponent<Placeable>();
+            string key = (p != null && !string.IsNullOrWhiteSpace(p.PrefabId)) ? p.PrefabId : prefab.name;
+            if (!lookup.ContainsKey(key))
+                lookup.Add(key, prefab);
+        }
 
+        // 2) (Optional) clear existing objects out of BuildRoot
+        if (clearExisting)
+            ClearChildrenServerAware(buildRoot);
+
+        // 3) Instantiate
         int spawned = 0, missing = 0;
         foreach (var pd in data.placeables)
         {
             if (pd == null) continue;
 
-            if (!prefabRegistry.TryGetValue(pd.prefabName, out var prefab) || prefab == null)
+            if (!lookup.TryGetValue(pd.prefabKey, out var prefab) || prefab == null)
             {
-                Debug.LogWarning($"[JsonManager] Missing prefab in registry: '{pd.prefabName}'");
+                Debug.LogWarning($"[JsonManager] Missing prefab for key '{pd.prefabKey}'");
                 missing++;
                 continue;
             }
@@ -82,25 +91,43 @@ public class JsonManager : MonoBehaviour
             t.localScale = pd.localScale;
             go.SetActive(true);
 
-            // Netcode spawn (alleen op server)
-            var netObj = go.GetComponent<Unity.Netcode.NetworkObject>();
+            // Netcode spawn (server only)
+            var netObj = go.GetComponent<NetworkObject>();
             if (netObj != null)
             {
-                if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
-                {
+                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
                     netObj.Spawn(true);
-                }
                 else
-                {
-                    Debug.LogWarning($"[JsonManager] Not server; skipping Spawn for '{pd.prefabName}'");
-                }
+                    Debug.LogWarning($"[JsonManager] Not server; skipped Spawn for '{pd.prefabKey}'");
             }
 
             spawned++;
         }
 
-        Debug.Log($"[JsonManager] Done. Spawned: {spawned}, MissingPrefabs: {missing}");
+        Debug.Log($"[JsonManager] Load done. Spawned: {spawned}, Missing: {missing}");
     }
 
+    // --- Helpers ---
+    private static string GetPrefabKey(GameObject go)
+    {
+        var p = go.GetComponent<Placeable>();
+        if (p != null && !string.IsNullOrWhiteSpace(p.PrefabId))
+            return p.PrefabId;
 
+        // fallback op (Clone)-loze naam
+        return go.name.Replace("(Clone)", "");
+    }
+
+    private void ClearChildrenServerAware(Transform root)
+    {
+        for (int i = root.childCount - 1; i >= 0; i--)
+        {
+            var child = root.GetChild(i);
+            var no = child.GetComponent<NetworkObject>();
+            if (no != null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+                no.Despawn(true);
+            else
+                Destroy(child.gameObject);
+        }
+    }
 }

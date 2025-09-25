@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 public static class SaveSystem
@@ -34,5 +36,31 @@ public static class SaveSystem
 
         Debug.LogWarning($"[SaveSystem] No save found at {path}");
         return null;
+    }
+
+    /// <summary>
+    /// load the most recent json file in the saves folder.
+    /// return the contents of JSON (wihtout .json) by 'out'.
+    /// </summary>
+    public static string LoadLatestJson(out string latestFileNameWithoutExt)
+    {
+        latestFileNameWithoutExt = null;
+        if (!Directory.Exists(SaveFolder)) return null;
+
+        var files = new DirectoryInfo(SaveFolder).GetFiles("*.json");
+        if (files.Length == 0) return null;
+
+        var latest = files.OrderByDescending(f => f.LastWriteTimeUtc).First();
+        latestFileNameWithoutExt = Path.GetFileNameWithoutExtension(latest.Name);
+        return File.ReadAllText(latest.FullName);
+    }
+
+    /// <summary>
+    /// make timestamp.
+    /// </summary>
+    public static string MakeTimestampedName(string baseName)
+    {
+        // Voorbeeld: MyBuild_2025-09-25_1542
+        return $"{baseName}_{DateTime.Now:yyyy-MM-dd_HHmm}";
     }
 }

@@ -2003,7 +2003,7 @@ PrefabInstance:
     - target: {fileID: 5289182684458692542, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 5
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5289182684458692542, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
@@ -2048,7 +2048,7 @@ PrefabInstance:
     - target: {fileID: 5289182684458692542, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: LoadBuildButton
+      value: LoadLatestBuildButton
       objectReference: {fileID: 0}
     - target: {fileID: 5289182684458692542, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
@@ -2618,7 +2618,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BuildManager
   ShowTopMostFoldoutHeaderGroup: 1
   buildRoot: {fileID: 205903984}
-  prefabCatalog: {fileID: 0}
+  prefabCatalog: {fileID: 11400000, guid: 874c9e41b13cd3e4493a01a8c493ac72, type: 2}
 --- !u!4 &713245239
 Transform:
   m_ObjectHideFlags: 0
