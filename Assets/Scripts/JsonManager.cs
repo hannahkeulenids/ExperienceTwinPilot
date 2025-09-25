@@ -1,8 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 
-// ---- data classes ----
+//
+// Data classes
+//
 [System.Serializable]
 public class PlaceableData
 {
@@ -19,6 +21,9 @@ public class BuildData
     public List<PlaceableData> placeables = new();
 }
 
+//
+// JsonManager
+//
 public class JsonManager : MonoBehaviour
 {
     // --- SAVE ---
@@ -68,11 +73,14 @@ public class JsonManager : MonoBehaviour
                 lookup.Add(key, prefab);
         }
 
-        // 2) (Optional) clear existing objects out of BuildRoot
+        // 2) Clear bestaande children indien gevraagd
         if (clearExisting)
             ClearChildrenServerAware(buildRoot);
 
-        // 3) Instantiate
+        // 3) Instantiate + parent → local TRS
+        var rootNO = buildRoot.GetComponent<NetworkObject>();
+        bool isServer = NetworkManager.Singleton && NetworkManager.Singleton.IsServer;
+
         int spawned = 0, missing = 0;
         foreach (var pd in data.placeables)
         {
@@ -85,21 +93,26 @@ public class JsonManager : MonoBehaviour
                 continue;
             }
 
-            var go = Instantiate(prefab, buildRoot);
-            var t = go.transform;
-            t.SetLocalPositionAndRotation(pd.localPosition, pd.localRotation);
-            t.localScale = pd.localScale;
-            go.SetActive(true);
+            var go = Instantiate(prefab);
+            go.SetActive(false);
 
-            // Netcode spawn (server only)
             var netObj = go.GetComponent<NetworkObject>();
-            if (netObj != null)
-            {
-                if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-                    netObj.Spawn(true);
-                else
-                    Debug.LogWarning($"[JsonManager] Not server; skipped Spawn for '{pd.prefabKey}'");
-            }
+
+            // Eerst parenten
+            if (netObj && isServer && rootNO)
+                netObj.TrySetParent(rootNO, worldPositionStays: false);
+            else
+                go.transform.SetParent(buildRoot, worldPositionStays: false);
+
+            // Dan local TRS toepassen
+            go.transform.localPosition = pd.localPosition;
+            go.transform.localRotation = pd.localRotation;
+            go.transform.localScale = pd.localScale;
+
+            // Activeren + eventueel spawn
+            go.SetActive(true);
+            if (netObj && isServer)
+                netObj.Spawn(true);
 
             spawned++;
         }
@@ -114,7 +127,6 @@ public class JsonManager : MonoBehaviour
         if (p != null && !string.IsNullOrWhiteSpace(p.PrefabId))
             return p.PrefabId;
 
-        // fallback op (Clone)-loze naam
         return go.name.Replace("(Clone)", "");
     }
 

@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: PrefabCatalog
   m_EditorClassIdentifier: Assembly-CSharp::PrefabCatalog
   prefabs:
+  - {fileID: 4551389557796796110, guid: cd2f9fc5965b0e1418d9e6c7999c1504, type: 3}
   - {fileID: 1546472452361269291, guid: a6475cc14d56a4d489f866c5f25691a6, type: 3}
