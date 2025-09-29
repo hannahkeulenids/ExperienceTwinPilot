@@ -2656,6 +2656,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   buildRoot: {fileID: 205903984}
   prefabCatalog: {fileID: 11400000, guid: 874c9e41b13cd3e4493a01a8c493ac72, type: 2}
+  rootScaling: 10
   simulationSceneName: SimulationScene
   simulationRootTag: SimulationBuildRoot
 --- !u!4 &713245239

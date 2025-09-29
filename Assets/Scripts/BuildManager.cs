@@ -12,6 +12,7 @@ public class BuildManager : NetworkBehaviour
     [SerializeField] Transform buildRoot;
     [SerializeField] private PrefabCatalog prefabCatalog;
     private Dictionary<string, GameObject> prefabRegistry;
+    [SerializeField] private float rootScaling;
 
    
     [Header("Simulation (scene name + spawn root tag")]
@@ -210,6 +211,8 @@ public class BuildManager : NetworkBehaviour
 
     private void StartSimulation_Server(string buildName)
     {
+
+        FixAllPlaceables_Server();
         // 1) Sla huidige tabletop build in-memory op
         string json = _json.SaveToString(buildRoot, buildName);
         if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] StartSimulation: empty JSON."); return; }
@@ -242,7 +245,7 @@ public class BuildManager : NetworkBehaviour
             if (simRootGO == null) { Debug.LogError($"[BuildManager] Simulation root with Tag '{simulationRootTag}' not found."); return; }
             var simRoot = simRootGO.transform;
             // x10 schaal op de root
-            simRoot.localScale = Vector3.one * 10f;
+            simRoot.localScale = Vector3.one * rootScaling;
 
             var rootNO = simRootGO.GetComponent<Unity.Netcode.NetworkObject>();
             Debug.Log($"[BuildManager] Sim root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
