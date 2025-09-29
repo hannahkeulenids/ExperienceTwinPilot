@@ -62,24 +62,22 @@ public class JsonManager : MonoBehaviour
         var data = JsonUtility.FromJson<BuildData>(json);
         if (data == null) { Debug.LogError("[JsonManager] Could not parse JSON."); return; }
 
-        // 1) Build lookup (key -> prefab); key = Placeable.PrefabId or prefab.name
+        // 1) Lookup (key -> prefab)
         var lookup = new Dictionary<string, GameObject>(System.StringComparer.OrdinalIgnoreCase);
         foreach (var prefab in catalog.prefabs)
         {
-            if (prefab == null) continue;
+            if (!prefab) continue;
             var p = prefab.GetComponent<Placeable>();
-            string key = (p != null && !string.IsNullOrWhiteSpace(p.PrefabId)) ? p.PrefabId : prefab.name;
-            if (!lookup.ContainsKey(key))
-                lookup.Add(key, prefab);
+            var key = (p != null && !string.IsNullOrWhiteSpace(p.PrefabId)) ? p.PrefabId : prefab.name;
+            if (!lookup.ContainsKey(key)) lookup.Add(key, prefab);
         }
 
         // 2) Clear bestaande children indien gevraagd
-        if (clearExisting)
-            ClearChildrenServerAware(buildRoot);
+        if (clearExisting) ClearChildrenServerAware(buildRoot);
 
-        // 3) Instantiate + parent → local TRS
+        // 3) Bepaal één keer buiten de loop
         var rootNO = buildRoot.GetComponent<NetworkObject>();
-        bool isServer = NetworkManager.Singleton && NetworkManager.Singleton.IsServer;
+        bool isServer = (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
 
         int spawned = 0, missing = 0;
         foreach (var pd in data.placeables)
@@ -93,26 +91,50 @@ public class JsonManager : MonoBehaviour
                 continue;
             }
 
+            // Instantiate inactief om hitches/awake-gedrag te minimaliseren
             var go = Instantiate(prefab);
             go.SetActive(false);
 
             var netObj = go.GetComponent<NetworkObject>();
 
             // Eerst parenten
-            if (netObj && isServer && rootNO)
-                netObj.TrySetParent(rootNO, worldPositionStays: false);
+            if (netObj != null && isServer && rootNO != null && rootNO.IsSpawned)
+            {
+                // NGO-parenting (synct over netwerk)
+                var ok = netObj.TrySetParent(rootNO, worldPositionStays: false);
+                if (!ok) Debug.LogWarning($"[JsonManager] TrySetParent failed now for '{pd.prefabKey}'");
+            }
             else
+            {
+                // Lokale parenting (of fallback als rootNO nog niet spawned is)
                 go.transform.SetParent(buildRoot, worldPositionStays: false);
+            }
 
-            // Dan local TRS toepassen
+            // Daarna local TRS instellen
             go.transform.localPosition = pd.localPosition;
             go.transform.localRotation = pd.localRotation;
             go.transform.localScale = pd.localScale;
 
-            // Activeren + eventueel spawn
+            // Activeren
             go.SetActive(true);
-            if (netObj && isServer)
+
+            // Netcode spawn (server only). Als nog niet geparent via NGO → opnieuw proberen na spawn.
+            if (netObj != null && isServer)
+            {
                 netObj.Spawn(true);
+
+                if (rootNO != null && rootNO.IsSpawned)
+                {
+                    // Zorg dat netwerk-parent klopt (voor het geval hierboven lokaal geparent werd)
+                    var ok2 = netObj.TrySetParent(rootNO, worldPositionStays: false);
+                    if (!ok2) StartCoroutine(TryParentNextFrame(netObj, rootNO));
+                }
+                else
+                {
+                    // Root nog niet spawned? Volgend frame proberen.
+                    StartCoroutine(TryParentNextFrame(netObj, rootNO));
+                }
+            }
 
             spawned++;
         }
@@ -124,22 +146,33 @@ public class JsonManager : MonoBehaviour
     private static string GetPrefabKey(GameObject go)
     {
         var p = go.GetComponent<Placeable>();
-        if (p != null && !string.IsNullOrWhiteSpace(p.PrefabId))
-            return p.PrefabId;
-
+        if (p != null && !string.IsNullOrWhiteSpace(p.PrefabId)) return p.PrefabId;
         return go.name.Replace("(Clone)", "");
     }
 
     private void ClearChildrenServerAware(Transform root)
     {
+        bool isServer = (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
+
         for (int i = root.childCount - 1; i >= 0; i--)
         {
             var child = root.GetChild(i);
             var no = child.GetComponent<NetworkObject>();
-            if (no != null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+
+            if (no != null && isServer && no.IsSpawned)
                 no.Despawn(true);
             else
                 Destroy(child.gameObject);
+        }
+    }
+
+    private System.Collections.IEnumerator TryParentNextFrame(NetworkObject child, NetworkObject rootNO)
+    {
+        yield return null; // 1 frame wachten
+        if (child != null && rootNO != null && rootNO.IsSpawned)
+        {
+            var ok = child.TrySetParent(rootNO, worldPositionStays: false);
+            if (!ok) Debug.LogWarning($"[JsonManager] TrySetParent retry failed for {child.name}");
         }
     }
 }
