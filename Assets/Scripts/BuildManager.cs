@@ -1,201 +1,66 @@
 ﻿using UnityEngine;
 using Unity.Netcode;
-using System.Collections.Generic;
-using Unity.Services.Multiplay.Authoring.Core.Assets;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
+[RequireComponent(typeof(JsonManager))]
 public class BuildManager : NetworkBehaviour
 {
-
-
-    [Header("Building setup")]
-    [SerializeField] Transform buildRoot;
+    [Header("Shared")]
     [SerializeField] private PrefabCatalog prefabCatalog;
-    private Dictionary<string, GameObject> prefabRegistry;
-    [SerializeField] private float rootScaling;
 
-   
-    [Header("Simulation (scene name + spawn root tag")]
+    [Header("Tabletop opties")]
+    [SerializeField] private Slider optionSlider;
+    [SerializeField] private GameObject[] options;
+
+    [Header("Tabletop")]
+    [SerializeField] private string tabletopSceneName = "TabletopScene";
+    [SerializeField] private string tabletopRootTag = "TabletopBuildRoot";
+    [SerializeField] private Transform buildRoot;             // tabletop root in de tabletop scene
+
+    [Header("Simulation")]
     [SerializeField] private string simulationSceneName = "SimulationScene";
     [SerializeField] private string simulationRootTag = "SimulationBuildRoot";
+    [SerializeField] private float simulationScale = 10f;
 
     private JsonManager _json;
-    private NetworkObject buildRootNO;
 
-    void Awake()
+    private enum PendingLoad { None, ToSimulation, ToTabletop }
+    private PendingLoad _pendingLoad = PendingLoad.None;
+    private bool _subscribed;
+
+    private void Awake()
     {
-
-        prefabRegistry = new Dictionary<string, GameObject>(System.StringComparer.OrdinalIgnoreCase);
-        foreach (var p in prefabCatalog.prefabs)
-            if (p != null) prefabRegistry[p.name] = p;
-
         _json = GetComponent<JsonManager>();
-
-        //moet wel een networkobject zijn 
-        if (buildRoot != null)
-            buildRootNO = buildRoot.GetComponent<NetworkObject>();
     }
 
-    // ===== Button handler =====
+    // Base options button call
+    public void OptionSliderButton()
+    {
+        int index = Mathf.RoundToInt(optionSlider.value);
+        for (int i = 0; i < options.Length; i++)
+            options[i].SetActive(i == index);
+    }
+    // =============== SAVE ===============
     public void FixAndSaveButton(string buildName = "MyBuild")
     {
-        Debug.Log($"FixAllPlaceablesButton pressed. IsServer={IsServer} IsClient={IsClient}");
-
-        if (IsServer) FixAndSave_Server(buildName); // host/server voert direct uit
-        else FixAndSave_ServerRpc(buildName); // clients vragen het de server
+        if (IsServer) FixAndSave_Server(buildName);
+        else FixAndSave_ServerRpc(buildName);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void FixAndSave_ServerRpc(string buildName)
-    {
-        FixAndSave_Server(buildName);
-    }
+    private void FixAndSave_ServerRpc(string buildName) => FixAndSave_Server(buildName);
 
-    // ===== Server only: de echte reparent =====
-    void FixAndSave_Server(string buildName)
+    private void FixAndSave_Server(string buildName)
     {
-        // alle placeables als child onder buildroot zetten
         FixAllPlaceables_Server();
-       
-        if (_json == null || buildRoot == null)
-        {
-            Debug.LogWarning("[BuildManager] JsonManager of buildRoot mist.");
-            return;
-        }
-
-        // serialize wegschrijven
-        string json = _json.SaveToString(buildRoot, buildName);
-
-        if (string.IsNullOrEmpty(json)) 
-        { 
-            Debug.LogError("[BuildManager] Save JSON empty.");
-            return; 
-        }
-
-        SaveSystem.SaveJson(buildName, json); //bestand weg schrijven via savesystem
-
-        Debug.Log($"[BuildManager] Saved '{buildName}' ({json.Length} chars)");
-        // Optioneel: File.WriteAllText(Application.persistentDataPath + $"/{buildName}.json", json);
+        var json = _json.SaveToString(buildRoot, buildName);
+        if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] Save JSON empty."); return; }
+        SaveSystem.SaveJson(buildName, json);
+        Debug.Log($"[BuildManager] Fix & Saved '{buildName}'");
     }
 
-    public void LoadLatestBuildButton()
-    {
-        if (IsServer)
-        {
-            LoadLatestBuild_Server();
-        }
-
-        else LoadLatestBuild_ServerRpc();
-        
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void LoadLatestBuild_ServerRpc()
-    {
-        LoadLatestBuild_Server();
-    }
-
-    private void LoadLatestBuild_Server()
-    {
-        if (prefabCatalog == null)
-        {
-            Debug.LogError("[BuildManager] PrefabCatalog not assigned.");
-            return;
-        }
-
-        string latestName;
-        string json = SaveSystem.LoadLatestJson(out latestName);
-        if (string.IsNullOrEmpty(json))
-        {
-            Debug.LogWarning("[BuildManager] No latest save found.");
-            return;
-        }
-
-        // Important: JsonManager first erases the existing files (clearExisting = true)
-        _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
-        Debug.Log($"[BuildManager] Loaded latest build '{latestName}'");
-    }
-
-
-    private void FixAllPlaceables_Server()
-    {
-        if (buildRoot == null)
-        {
-            Debug.LogError("[BuildManager] buildRoot is null.");
-            return;
-        }
-
-        //enomerator van makne?
-        var placeables = GameObject.FindGameObjectsWithTag("Placeable");
-        Debug.Log($"[BuildManager] Server fixing {placeables.Length} placeables…");
-
-        foreach (var go in placeables)
-        {
-            // Heeft het object een NetworkObject?
-            if (go.TryGetComponent(out NetworkObject childNO))
-            {
-                // Als buildRoot ook een NetworkObject heeft, gebruik NGO-parenting
-                if (buildRootNO != null)
-                {
-                    var ok = childNO.TrySetParent(buildRootNO, worldPositionStays: true);
-                    if (!ok) Debug.LogWarning($"TrySetParent failed for {go.name}");
-                }
-                else
-                {
-                    // Fallback (niet-gesynchroniseerd): alleen hiërarchie netjes
-                    go.transform.SetParent(buildRoot, true);
-                }
-            }
-            else
-            {
-                // Niet-networked object → gewone parenting is prima
-                go.transform.SetParent(buildRoot, true);
-            }
-        }
-
-        Debug.Log("[BuildManager] Server reparent done.");
-
-
-    }
-    //------ load button -------------
-    public void LoadBuildButton(string buildName)
-    {
-        
-        if (IsServer) LoadBuild_Server(buildName);
-        else LoadBuild_ServerRpc(buildName);
-    }
-
-
-    [ServerRpc(RequireOwnership = false)]
-    private void LoadBuild_ServerRpc(string buildName)
-    {
-        LoadBuild_Server(buildName);
-    }
-
-    private void LoadBuild_Server(string buildName)
-    {
-        string LatestName;
-        string json = SaveSystem.LoadLatestJson(out LatestName);
-        if (string.IsNullOrEmpty(json))
-        {
-            Debug.LogWarning($"[BuildManager] No JSON found for build '{buildName}'");
-            return;
-        }
-
-        if (_json != null && buildRoot != null)
-        {
-            //_json.LoadFromString(buildRoot, json, prefabRegistry);
-            _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
-            Debug.Log($"[BuildManager] Loaded build '{buildName}'");
-        }
-        else
-        {
-            Debug.LogError("[BuildManager] Missing JsonManager or buildRoot.");
-        }
-
-    }
-
-    // ===================== START SIMULATIE =====================
+    // =============== START SIMULATION ===============
     public void StartSimulationButton(string buildName = "MyBuild")
     {
         if (IsServer) StartSimulation_Server(buildName);
@@ -203,70 +68,157 @@ public class BuildManager : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void StartSimulation_ServerRpc(string buildName)
-    {
-        StartSimulation_Server(buildName);
-        
-    }
+    private void StartSimulation_ServerRpc(string buildName) => StartSimulation_Server(buildName);
 
     private void StartSimulation_Server(string buildName)
     {
-
+        // 1) zorg dat alles onder tabletop buildRoot zit
         FixAllPlaceables_Server();
-        // 1) Sla huidige tabletop build in-memory op
-        string json = _json.SaveToString(buildRoot, buildName);
+
+        // 2) JSON in memory
+        var json = _json.SaveToString(buildRoot, buildName);
         if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] StartSimulation: empty JSON."); return; }
         BuildClipboard.LastJson = json;
         BuildClipboard.LastBuildName = buildName;
 
-        // (optioneel) ook naar disk:
-        // SaveSystem.SaveJson(SaveSystem.MakeTimestampedName(buildName), json);
+        // 3) scene wissel
+        LoadSceneNetworked(simulationSceneName, PendingLoad.ToSimulation);
+    }
 
-        // 2) NGO Scene load voor alle peers
+    // =============== RETURN TO TABLETOP ===============
+    public void ReturnToTabletopButton(string buildName = "MyBuild")
+    {
+        if (IsServer) ReturnToTabletop_Server(buildName);
+        else ReturnToTabletop_ServerRpc(buildName);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ReturnToTabletop_ServerRpc(string buildName) => ReturnToTabletop_Server(buildName);
+
+    private void ReturnToTabletop_Server(string buildName)
+    {
+        // 1) pak sim root en save current state
+        var simRoot = GameObject.FindWithTag(simulationRootTag)?.transform;
+        if (!simRoot) { Debug.LogError("[BuildManager] Return: Simulation root not found."); return; }
+
+        var json = _json.SaveToString(simRoot, buildName);
+        if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] Return: empty JSON."); return; }
+        BuildClipboard.LastJson = json;
+        BuildClipboard.LastBuildName = buildName;
+
+        // 2) scene wissel terug
+        LoadSceneNetworked(tabletopSceneName, PendingLoad.ToTabletop);
+    }
+
+    // =============== SCENE HANDLING (SAFE MODE) ===============
+    private void LoadSceneNetworked(string sceneName, PendingLoad mode)
+    {
         var nsm = NetworkManager.SceneManager;
         if (nsm == null) { Debug.LogError("[BuildManager] No NetworkSceneManager."); return; }
 
-        nsm.OnSceneEvent += OnSceneEvent_Server; // subscribe
-        nsm.LoadScene(simulationSceneName, LoadSceneMode.Single);
+        // altijd de- en resubscriben (voorkomt dubbele handlers)
+        if (_subscribed)
+        {
+            nsm.OnSceneEvent -= OnSceneEvent_Server;
+            _subscribed = false;
+        }
+        nsm.OnSceneEvent += OnSceneEvent_Server;
+        _subscribed = true;
+
+        _pendingLoad = mode;
+        nsm.LoadScene(sceneName, LoadSceneMode.Single);
     }
 
-    // Wordt meerdere keren aangeroepen voor verschillende events; we filteren op LoadComplete + juiste scene
     private void OnSceneEvent_Server(SceneEvent e)
     {
         if (!IsServer) return;
+        if (e.SceneEventType != SceneEventType.LoadComplete) return;
 
-        if (e.SceneEventType == SceneEventType.LoadComplete && e.SceneName == simulationSceneName)
+        // unhook direct
+        if (_subscribed)
         {
-            // unsubscriben om dubbele calls te voorkomen
             NetworkManager.SceneManager.OnSceneEvent -= OnSceneEvent_Server;
+            _subscribed = false;
+        }
 
-            // 3) Zoek de simulation root in de nieuwe scene
-            var simRootGO = GameObject.FindWithTag(simulationRootTag);
-            if (simRootGO == null) { Debug.LogError($"[BuildManager] Simulation root with Tag '{simulationRootTag}' not found."); return; }
-            var simRoot = simRootGO.transform;
-            // x10 schaal op de root
-            simRoot.localScale = Vector3.one * rootScaling;
-
-            var rootNO = simRootGO.GetComponent<Unity.Netcode.NetworkObject>();
-            Debug.Log($"[BuildManager] Sim root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
-
-            if (prefabCatalog == null) { Debug.LogError("[BuildManager] PrefabCatalog not assigned."); return; }
-
-
-
-            if (!string.IsNullOrEmpty(BuildClipboard.LastJson))
-            {
-                // 4) JSON → bouwen onder simulation root (clearExisting = true voor een schone scene)
-                _json.LoadFromString(simRoot, BuildClipboard.LastJson, prefabCatalog, clearExisting: true);
-                Debug.Log($"[BuildManager] Simulation loaded: '{BuildClipboard.LastBuildName}'");
-            }
-            else
-            {
-                Debug.LogWarning("[BuildManager] No JSON in BuildClipboard.");
-            }
+        if (_pendingLoad == PendingLoad.ToSimulation && e.SceneName == simulationSceneName)
+        {
+            HandleSimulationLoaded();
+            _pendingLoad = PendingLoad.None;
+        }
+        else if (_pendingLoad == PendingLoad.ToTabletop && e.SceneName == tabletopSceneName)
+        {
+            HandleTabletopLoaded();
+            _pendingLoad = PendingLoad.None;
         }
     }
 
+    private void HandleSimulationLoaded()
+    {
+        var simRootGO = GameObject.FindWithTag(simulationRootTag);
+        if (!simRootGO) { Debug.LogError($"[BuildManager] Sim root tag '{simulationRootTag}' not found."); return; }
 
+        // schaal de root (vereist NetworkTransform met Sync Scale)
+        var simRoot = simRootGO.transform;
+        simRoot.localScale = Vector3.one * simulationScale;
+        var nt = simRootGO.GetComponent<Unity.Netcode.Components.NetworkTransform>();
+        if (nt != null) nt.Teleport(simRoot.position, simRoot.rotation, simRoot.localScale);
+
+        var rootNO = simRootGO.GetComponent<NetworkObject>();
+        Debug.Log($"[BuildManager] Sim root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
+
+        if (!string.IsNullOrEmpty(BuildClipboard.LastJson) && prefabCatalog != null)
+        {
+            _json.LoadFromString(simRoot, BuildClipboard.LastJson, prefabCatalog, clearExisting: true);
+            Debug.Log($"[BuildManager] Simulation loaded '{BuildClipboard.LastBuildName}' @ x{simulationScale}");
+        }
+        else Debug.LogWarning("[BuildManager] Missing JSON or PrefabCatalog for simulation load.");
+    }
+
+    private void HandleTabletopLoaded()
+    {
+        var tableRootGO = GameObject.FindWithTag(tabletopRootTag);
+        if (!tableRootGO) { Debug.LogError($"[BuildManager] Tabletop root tag '{tabletopRootTag}' not found."); return; }
+
+        var tableRoot = tableRootGO.transform;
+        tableRoot.localScale = Vector3.one; // tabletop = 1
+
+        var rootNO = tableRootGO.GetComponent<NetworkObject>();
+        Debug.Log($"[BuildManager] Tabletop root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
+
+        if (!string.IsNullOrEmpty(BuildClipboard.LastJson) && prefabCatalog != null)
+        {
+            _json.LoadFromString(tableRoot, BuildClipboard.LastJson, prefabCatalog, clearExisting: true);
+            Debug.Log($"[BuildManager] Tabletop reloaded '{BuildClipboard.LastBuildName}'.");
+        }
+        else Debug.LogWarning("[BuildManager] Missing JSON or PrefabCatalog for tabletop load.");
+    }
+
+    // =============== RE-PARENT ===============
+    private void FixAllPlaceables_Server()
+    {
+        if (!buildRoot)
+        {
+            Debug.LogError("[BuildManager] buildRoot is null.");
+            return;
+        }
+
+        var buildRootNO = buildRoot.GetComponent<NetworkObject>();
+        var placeables = GameObject.FindGameObjectsWithTag("Placeable");
+        foreach (var go in placeables)
+        {
+            if (!go) continue;
+
+            if (go.TryGetComponent(out NetworkObject childNO))
+            {
+                if (buildRootNO != null)
+                {
+                    if (!childNO.TrySetParent(buildRootNO, worldPositionStays: true))
+                        Debug.LogWarning($"[BuildManager] TrySetParent failed for {go.name}");
+                }
+                else go.transform.SetParent(buildRoot, worldPositionStays: true);
+            }
+            else go.transform.SetParent(buildRoot, worldPositionStays: true);
+        }
+    }
 }
-

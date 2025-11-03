@@ -11,6 +11,7 @@ TagManager:
   - Destroyer
   - Placeable
   - SimulationBuildRoot
+  - TabletopBuildRoot
   layers:
   - Default
   - TransparentFX
