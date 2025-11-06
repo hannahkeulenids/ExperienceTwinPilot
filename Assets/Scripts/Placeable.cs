@@ -10,4 +10,13 @@ public class Placeable : MonoBehaviour
         gameObject.tag = "Placeable";
         Debug.Log("changed tag");
     }
+
+    //private void LateUpdate()
+    //{
+    //    transform.position = new Vector3(
+    //        Mathf.Round(transform.position.x),
+    //        Mathf.Round(transform.position.y),
+    //        Mathf.Round(transform.position.z)
+    //    );
+    //}
 }

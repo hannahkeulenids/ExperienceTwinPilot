@@ -2,6 +2,8 @@
 using Unity.Netcode;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(JsonManager))]
 public class BuildManager : NetworkBehaviour
@@ -23,7 +25,11 @@ public class BuildManager : NetworkBehaviour
     [SerializeField] private string simulationRootTag = "SimulationBuildRoot";
     [SerializeField] private float simulationScale = 10f;
 
+    //[Header ("Saves")]
+    //[SerializeField] private TMP_Dropdown savesDropdown;
+
     private JsonManager _json;
+    private List<string> _saveNames = new();
 
     private enum PendingLoad { None, ToSimulation, ToTabletop }
     private PendingLoad _pendingLoad = PendingLoad.None;
@@ -33,6 +39,30 @@ public class BuildManager : NetworkBehaviour
     {
         _json = GetComponent<JsonManager>();
     }
+
+    
+
+    [ServerRpc(RequireOwnership = false)]
+    private void LoadBuild_ServerRpc(string buildName) => LoadBuild_Server(buildName);
+
+    private void LoadBuild_Server(string buildName)
+    {
+        if (prefabCatalog == null || buildRoot == null)
+        {
+            Debug.LogError("[BuildManager] prefabCatalog of buildRoot niet ingesteld.");
+            return;
+        }
+
+        if (!SaveSystem.TryLoadJson(buildName, out var json))
+        {
+            Debug.LogWarning($"[BuildManager] Save '{buildName}' niet gevonden.");
+            return;
+        }
+
+        _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
+        Debug.Log($"[BuildManager] Build '{buildName}' geladen via dropdown.");
+    }
+
 
     // Base options button call
     public void OptionSliderButton()
@@ -49,15 +79,26 @@ public class BuildManager : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void FixAndSave_ServerRpc(string buildName) => FixAndSave_Server(buildName);
+    private void FixAndSave_ServerRpc(string buildName)
+    {
+        FixAndSave_Server(buildName);
+    }
 
     private void FixAndSave_Server(string buildName)
     {
         FixAllPlaceables_Server();
+
         var json = _json.SaveToString(buildRoot, buildName);
-        if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] Save JSON empty."); return; }
-        SaveSystem.SaveJson(buildName, json);
-        Debug.Log($"[BuildManager] Fix & Saved '{buildName}'");
+        if (string.IsNullOrEmpty(json)) 
+        { 
+            Debug.LogError("[BuildManager] Save JSON empty."); return; 
+        }
+        //maak unieke bestandsnaam met tijdstempel
+        string timestampedName = SaveSystem.MakeTimestampedName(buildName);
+
+        SaveSystem.SaveJson(timestampedName, json);
+        Debug.Log($"[BuildManager] Fix & Saved '{timestampedName}.json'");
+        
     }
 
     // =============== START SIMULATION ===============

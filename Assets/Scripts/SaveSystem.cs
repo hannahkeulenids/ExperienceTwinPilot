@@ -38,6 +38,16 @@ public static class SaveSystem
         return null;
     }
 
+    public static string[] ListSavesNoExtension()
+    {
+        var folder = Path.Combine(UnityEngine.Application.persistentDataPath, "Saves");
+        if (!Directory.Exists(folder)) return System.Array.Empty<string>();
+
+        return Directory.GetFiles(folder, "*.json")
+                        .Select(Path.GetFileNameWithoutExtension)
+                        .OrderBy(n => n)
+                        .ToArray();
+    }
     /// <summary>
     /// load the most recent json file in the saves folder.
     /// return the contents of JSON (wihtout .json) by 'out'.
@@ -63,4 +73,11 @@ public static class SaveSystem
         // Voorbeeld: MyBuild_2025-09-25_1542
         return $"{baseName}_{DateTime.Now:yyyy-MM-dd_HHmm}";
     }
+
+    public static bool TryLoadJson(string fileName, out string json)
+    {
+        json = LoadJson(fileName);
+        return !string.IsNullOrEmpty(json);
+    }
+
 }
