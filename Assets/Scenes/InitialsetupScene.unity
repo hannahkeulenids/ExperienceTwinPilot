@@ -3856,7 +3856,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   tabletopSceneName: TabletopScene
-  startTabletopButton: {fileID: 1141853684}
 --- !u!4 &685872872
 Transform:
   m_ObjectHideFlags: 0
@@ -5734,18 +5733,6 @@ RectTransform:
     type: 3}
   m_PrefabInstance: {fileID: 1211906474}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1141853684 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5289182684458692542, guid: e5db301629853dd4a99835fa70099d79,
-    type: 3}
-  m_PrefabInstance: {fileID: 1211906474}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1141853679}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1171606350
 GameObject:
   m_ObjectHideFlags: 0
@@ -9686,6 +9673,11 @@ PrefabInstance:
       propertyPath: m_StaticEditorFlags
       value: 2147483647
       objectReference: {fileID: 0}
+    - target: {fileID: 3257752470500975894, guid: dc724f6ded268fb418a7054aa893313d,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3371752984175957268, guid: dc724f6ded268fb418a7054aa893313d,
         type: 3}
       propertyPath: m_StaticEditorFlags
@@ -9709,7 +9701,7 @@ PrefabInstance:
     - target: {fileID: 5730377590517249992, guid: dc724f6ded268fb418a7054aa893313d,
         type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2697955240
+      value: 1312424985
       objectReference: {fileID: 0}
     - target: {fileID: 5730377590517249992, guid: dc724f6ded268fb418a7054aa893313d,
         type: 3}
