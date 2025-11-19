@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using System.IO;
 
 [RequireComponent(typeof(JsonManager))]
 public class BuildManager : NetworkBehaviour
@@ -24,6 +25,12 @@ public class BuildManager : NetworkBehaviour
     [SerializeField] private string simulationSceneName = "SimulationScene";
     [SerializeField] private string simulationRootTag = "SimulationBuildRoot";
     [SerializeField] private float simulationScale = 10f;
+
+    [Header("Snapshot (Tabletop)")]
+    [SerializeField] private Camera snapshotCamera;     // sleep je tabletop camera hier
+    //[SerializeField] private int snapshotWidth = 1920;
+    //[SerializeField] private int snapshotHeight = 1080;
+    //[SerializeField] private bool snapshotIncludeAlpha = false; // meestal false
 
     //[Header ("Saves")]
     //[SerializeField] private TMP_Dropdown savesDropdown;
@@ -98,7 +105,10 @@ public class BuildManager : NetworkBehaviour
 
         SaveSystem.SaveJson(timestampedName, json);
         Debug.Log($"[BuildManager] Fix & Saved '{timestampedName}.json'");
-        
+
+        //opslaan png van topdowncamera
+        SaveSnapshotPNG(timestampedName);
+
     }
 
     // =============== START SIMULATION ===============
@@ -115,6 +125,7 @@ public class BuildManager : NetworkBehaviour
     {
         // 1) zorg dat alles onder tabletop buildRoot zit
         FixAllPlaceables_Server();
+
 
         // 2) JSON in memory
         var json = _json.SaveToString(buildRoot, buildName);
@@ -261,5 +272,47 @@ public class BuildManager : NetworkBehaviour
             }
             else go.transform.SetParent(buildRoot, worldPositionStays: true);
         }
+
     }
+
+    private string SaveSnapshotPNG(string baseFileName)
+    {
+        if (snapshotCamera == null)
+        {
+            Debug.LogWarning("[BuildManager] No snapshotCamera assigned; skipping screenshot.");
+            return null;
+        }
+
+        if (snapshotCamera.targetTexture == null)
+        {
+            Debug.LogError("[BuildManager] Snapshot camera has no RenderTexture assigned!");
+            return null;
+        }
+
+        // Forceer één render naar de targettexture
+        snapshotCamera.Render();
+
+        // Lees pixels uit het toegewezen RenderTexture
+        RenderTexture rt = snapshotCamera.targetTexture;
+        RenderTexture.active = rt;
+
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        tex.Apply();
+
+        RenderTexture.active = null;
+
+        // Schrijf PNG naar Saves-folder
+        string folder = Path.Combine(Application.persistentDataPath, "Saves");
+        if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, baseFileName + ".png");
+
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        Destroy(tex);
+
+        Debug.Log($"[BuildManager] Snapshot saved → {path}");
+        return path;
+    }
+
+
 }

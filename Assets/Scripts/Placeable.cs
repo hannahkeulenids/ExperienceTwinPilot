@@ -8,7 +8,7 @@ public class Placeable : MonoBehaviour
     private void OnTriggerExit(Collider other)
     {
         gameObject.tag = "Placeable";
-        Debug.Log("changed tag");
+     
     }
 
 }

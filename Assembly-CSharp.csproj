@@ -64,11 +64,14 @@
     <Compile Include="Assets\Scripts\SimulationSceneManager.cs" />
     <Compile Include="Assets\Scripts\Placeable.cs" />
     <Compile Include="Assets\Scripts\XRGridSnapper.cs" />
+    <Compile Include="Assets\Scripts\PrefabSelectionManager.cs" />
     <Compile Include="Assets\Scripts\InitialStartupManager.cs" />
     <Compile Include="Assets\Scripts\SaveSystem.cs" />
     <Compile Include="Assets\Scripts\BuildClipboard.cs" />
+    <Compile Include="Assets\Scripts\TrashZone.cs" />
     <Compile Include="Assets\Scripts\NetworkUIManager.cs" />
     <Compile Include="Assets\Scripts\NetBootstrap.cs" />
+    <Compile Include="Assets\Scripts\SpawnHelper.cs" />
     <Compile Include="Assets\Scripts\BuildManager.cs" />
     <Compile Include="Assets\Scripts\PrefabCatalog.cs" />
     <Compile Include="Assets\Scripts\JsonManager.cs" />
