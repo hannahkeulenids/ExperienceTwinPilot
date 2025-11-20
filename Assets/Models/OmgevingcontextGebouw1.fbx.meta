@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d3ae81bd9a2e4c746913f57e4913123e
+guid: f38f96cddf6451245b2b611bc8785e71
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -62,11 +62,11 @@ ModelImporter:
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
-    secondaryUVAreaDistortion: 15.000001
+    secondaryUVAreaDistortion: 15
     secondaryUVHardAngle: 88
     secondaryUVMarginMethod: 1
     secondaryUVMinLightmapResolution: 40
-    secondaryUVMinObjectScale: 1
+    secondaryUVMinObjectScale: 0.02
     secondaryUVPackMargin: 4
     useFileScale: 1
     strictVertexDataChecks: 0

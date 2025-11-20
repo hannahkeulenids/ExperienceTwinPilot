@@ -559,7 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb963138399f75d47814df5f17895b29, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRGridSnapper
-  useGrid: 1
+  useGrid: 0
   size: {x: 0.1, y: 0.1, z: 0.1}
   offset: {x: 0, y: 0, z: 0}
   gridOrigin: {fileID: 0}

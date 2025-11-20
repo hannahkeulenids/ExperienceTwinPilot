@@ -1,9 +1,39 @@
 fileFormatVersion: 2
-guid: d3ae81bd9a2e4c746913f57e4913123e
+guid: b9267af7ea0dade4b930952e762cb8d8
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Daktrim
+    second: {fileID: 2100000, guid: 16fa1ee7e520ddb4d94c6a03aade1520, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Facade
+    second: {fileID: 2100000, guid: 12a8f25fdc3c3444a8e0649e7f5b47a9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Facade2
+    second: {fileID: 2100000, guid: 12a8f25fdc3c3444a8e0649e7f5b47a9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: FacadeDetail
+    second: {fileID: 2100000, guid: 12a8f25fdc3c3444a8e0649e7f5b47a9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Window
+    second: {fileID: 2100000, guid: fa8e3ccdfcc11a1478603a12923b7704, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WindowFrame
+    second: {fileID: 2100000, guid: 3348e98a29d65884c88f23885c91c68b, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -46,9 +76,9 @@ ModelImporter:
     nodeNameCollisionStrategy: 1
     fileIdsGeneration: 2
     swapUVChannels: 0
-    generateSecondaryUV: 1
+    generateSecondaryUV: 0
     useFileUnits: 1
-    keepQuads: 0
+    keepQuads: 1
     weldVertices: 1
     bakeAxisConversion: 0
     preserveHierarchy: 0
