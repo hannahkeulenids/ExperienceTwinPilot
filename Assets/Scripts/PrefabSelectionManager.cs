@@ -3,6 +3,8 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
 using XRMultiplayer; // NetworkBaseInteractable
+using UnityEngine.XR.Content.Interaction; // voor XRKnob
+
 
 public class PrefabSelectionManager : NetworkBehaviour
 {
@@ -14,6 +16,10 @@ public class PrefabSelectionManager : NetworkBehaviour
 
     [Header("Slider die de pagina kiest")]
     [SerializeField] private Slider groenSlider;
+    [SerializeField] private GameObject groenSliderFysiek;
+    [SerializeField] private XRKnob pageKnob;             // <- jouw nieuwe VR knob
+    private bool _updatingKnobFromCode = false;
+
 
     // Server authoritative → sync naar iedereen
     public NetworkVariable<int> CurrentPage = new(
@@ -39,19 +45,26 @@ public class PrefabSelectionManager : NetworkBehaviour
     {
         CurrentPage.OnValueChanged += OnPageChanged;
         ApplyPageToHolders(CurrentPage.Value);
-        InitSlider();
+        InitSlider();   // als je de UI slider nog wil gebruiken
+        InitKnob();     // nieuwe regel
     }
+
 
     public override void OnNetworkDespawn()
     {
         CurrentPage.OnValueChanged -= OnPageChanged;
     }
 
+
     private void OnDisable()
     {
         if (groenSlider != null)
             groenSlider.onValueChanged.RemoveListener(OnSliderChanged);
+
+        if (pageKnob != null)
+            pageKnob.onValueChange.RemoveListener(OnKnobValueChanged);
     }
+
 
     // ---------- Slider ----------
     private void InitSlider()
@@ -67,9 +80,39 @@ public class PrefabSelectionManager : NetworkBehaviour
         groenSlider.onValueChanged.AddListener(OnSliderChanged);
     }
 
+    private void InitKnob()
+    {
+        if (!pageKnob) return;
+
+        // Eerst oude listeners weg (veilig, ook als er nog geen waren)
+        pageKnob.onValueChange.RemoveListener(OnKnobValueChanged);
+        pageKnob.onValueChange.AddListener(OnKnobValueChanged);
+
+        // Knop gelijk zetten met huidige page
+        SyncKnobWithPage(CurrentPage.Value);
+    }
+
     private void OnSliderChanged(float v)
     {
         RequestSetPage((int)v);
+    }
+
+    private void OnKnobValueChanged(float knobValue)
+    {
+        if (_updatingKnobFromCode) return; // voorkomen dat we reageren op onze eigen updates
+
+        if (PageCount <= 1)
+        {
+            RequestSetPage(0);
+            return;
+        }
+
+        // knobValue is 0..1 → page 0..PageCount-1
+        float pageFloat = knobValue * (PageCount - 1);
+        int page = Mathf.RoundToInt(pageFloat);
+        page = Mathf.Clamp(page, 0, PageCount - 1);
+
+        RequestSetPage(page);
     }
 
     // ---------- Page set ----------
@@ -79,7 +122,30 @@ public class PrefabSelectionManager : NetworkBehaviour
 
         if (groenSlider)
             groenSlider.SetValueWithoutNotify(Mathf.Clamp(newV, 0, Mathf.Max(0, PageCount - 1)));
+
+        SyncKnobWithPage(newV);   // <- nieuw
     }
+
+    private void SyncKnobWithPage(int page)
+    {
+        if (!pageKnob) return;
+
+        if (PageCount <= 1)
+        {
+            _updatingKnobFromCode = true;
+            pageKnob.value = 0f;
+            _updatingKnobFromCode = false;
+            return;
+        }
+
+        float normalized = page / (float)(PageCount - 1); // 0..1
+        normalized = Mathf.Clamp01(normalized);
+
+        _updatingKnobFromCode = true;
+        pageKnob.value = normalized;
+        _updatingKnobFromCode = false;
+    }
+
 
     /// UI roept deze variant direct aan met een int (optioneel)
     public void RequestSetPage(int page)

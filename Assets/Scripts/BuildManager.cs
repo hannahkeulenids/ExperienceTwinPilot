@@ -1,278 +1,471 @@
 ﻿using UnityEngine;
-using Unity.Netcode;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using TMPro;
+using Unity.Netcode;
 using System.Collections.Generic;
+using System;
 using System.IO;
+using UnityEngine.XR.Content.Interaction; // XRKnob
 
-[RequireComponent(typeof(JsonManager))]
-public class BuildManager : NetworkBehaviour
+public class BuildManager : MonoBehaviour
 {
-    [Header("Shared")]
-    [SerializeField] private PrefabCatalog prefabCatalog;
+    public static BuildManager Instance { get; private set; }
 
-    [Header("Tabletop opties")]
-    [SerializeField] private Slider optionSlider;
-    [SerializeField] private GameObject[] options;
+    // cache van originele placeables
+    private readonly List<GameObject> _originalPlaceables = new List<GameObject>();
 
-    [Header("Tabletop")]
+    [Header("Root Objects")]
+    [SerializeField] private Transform tabletopRoot;          // TabletopBuildRoot
     [SerializeField] private string tabletopSceneName = "TabletopScene";
-    [SerializeField] private string tabletopRootTag = "TabletopBuildRoot";
-    [SerializeField] private Transform buildRoot;             // tabletop root in de tabletop scene
-
-    [Header("Simulation")]
     [SerializeField] private string simulationSceneName = "SimulationScene";
-    [SerializeField] private string simulationRootTag = "SimulationBuildRoot";
-    [SerializeField] private float simulationScale = 10f;
 
-    [Header("Snapshot (Tabletop)")]
-    [SerializeField] private Camera snapshotCamera;     // sleep je tabletop camera hier
-    //[SerializeField] private int snapshotWidth = 1920;
-    //[SerializeField] private int snapshotHeight = 1080;
-    //[SerializeField] private bool snapshotIncludeAlpha = false; // meestal false
+    [Header("Options UI")]
+    [SerializeField] public Slider optionSlider;
+    [SerializeField] public GameObject[] tabletopOptions;
+    [SerializeField] public GameObject[] simulationOptions;
+    [SerializeField] private XRKnob optionKnob;               // XR-knop in VR
 
-    //[Header ("Saves")]
-    //[SerializeField] private TMP_Dropdown savesDropdown;
+    [Header("Simulation Settings")]
+    [SerializeField] public float simulationScale = 50f;
 
-    private JsonManager _json;
-    private List<string> _saveNames = new();
+    [SerializeField] private int _lastActiveOptionIndex = 0;
 
-    private enum PendingLoad { None, ToSimulation, ToTabletop }
-    private PendingLoad _pendingLoad = PendingLoad.None;
-    private bool _subscribed;
+    [SerializeField] private Camera snapshotCamera;
+
+    private JsonManager jsonManager;
+
+    // interne flag om recursion te voorkomen bij knob-updates
+    private bool _updatingOptionKnobFromCode = false;
+
+    // ------------------------------------------------------------
 
     private void Awake()
     {
-        _json = GetComponent<JsonManager>();
-    }
-
-    
-
-    [ServerRpc(RequireOwnership = false)]
-    private void LoadBuild_ServerRpc(string buildName) => LoadBuild_Server(buildName);
-
-    private void LoadBuild_Server(string buildName)
-    {
-        if (prefabCatalog == null || buildRoot == null)
+        if (Instance != null && Instance != this)
         {
-            Debug.LogError("[BuildManager] prefabCatalog of buildRoot niet ingesteld.");
+            Destroy(gameObject);
             return;
         }
 
-        if (!SaveSystem.TryLoadJson(buildName, out var json))
+        Instance = this;
+
+        DontDestroyOnLoad(gameObject);
+        if (tabletopRoot != null)
+            DontDestroyOnLoad(tabletopRoot.gameObject);
+
+        jsonManager = GetComponent<JsonManager>();
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+
+        // Optioneel: listeners opruimen
+        if (optionSlider != null)
+            optionSlider.onValueChanged.RemoveListener(OnOptionSliderChanged);
+
+        if (optionKnob != null)
+            optionKnob.onValueChange.RemoveListener(OnOptionKnobChanged);
+    }
+
+    private void RebindTabletopRefs()
+    {
+        // probeer bindings-object in de huidige scene te vinden
+        var bindings = FindObjectOfType<TabletopSceneBindings>();
+        if (bindings == null)
         {
-            Debug.LogWarning($"[BuildManager] Save '{buildName}' niet gevonden.");
+            Debug.LogWarning("[BuildManager] TabletopSceneBindings niet gevonden in deze scene.");
             return;
         }
 
-        _json.LoadFromString(buildRoot, json, prefabCatalog, clearExisting: true);
-        Debug.Log($"[BuildManager] Build '{buildName}' geladen via dropdown.");
+        optionSlider = bindings.optionSlider;
+        tabletopOptions = bindings.tabletopOptions;
+        optionKnob = bindings.optionKnob;
+
+        Debug.Log($"[BuildManager] Tabletop refs hersteld: " +
+                  $"slider = {(optionSlider ? optionSlider.name : "null")}, " +
+                  $"knob = {(optionKnob ? optionKnob.name : "null")}, " +
+                  $"options = {(tabletopOptions != null ? tabletopOptions.Length : 0)}");
     }
 
+    // ============================================================
+    //  UI INIT
+    // ============================================================
 
-    // Base options button call
-    public void OptionSliderButton()
+    private void InitOptionsUI()
     {
-        int index = Mathf.RoundToInt(optionSlider.value);
-        for (int i = 0; i < options.Length; i++)
-            options[i].SetActive(i == index);
-    }
-    // =============== SAVE ===============
-    public void FixAndSaveButton(string buildName = "MyBuild")
-    {
-        if (IsServer) FixAndSave_Server(buildName);
-        else FixAndSave_ServerRpc(buildName);
-    }
+        int maxIndex = (tabletopOptions != null && tabletopOptions.Length > 0)
+            ? tabletopOptions.Length - 1
+            : 0;
 
-    [ServerRpc(RequireOwnership = false)]
-    private void FixAndSave_ServerRpc(string buildName)
-    {
-        FixAndSave_Server(buildName);
-    }
-
-    private void FixAndSave_Server(string buildName)
-    {
-        FixAllPlaceables_Server();
-
-        var json = _json.SaveToString(buildRoot, buildName);
-        if (string.IsNullOrEmpty(json)) 
-        { 
-            Debug.LogError("[BuildManager] Save JSON empty."); return; 
-        }
-        //maak unieke bestandsnaam met tijdstempel
-        string timestampedName = SaveSystem.MakeTimestampedName(buildName);
-
-        SaveSystem.SaveJson(timestampedName, json);
-        Debug.Log($"[BuildManager] Fix & Saved '{timestampedName}.json'");
-
-        //opslaan png van topdowncamera
-        SaveSnapshotPNG(timestampedName);
-
-    }
-
-    // =============== START SIMULATION ===============
-    public void StartSimulationButton(string buildName = "MyBuild")
-    {
-        if (IsServer) StartSimulation_Server(buildName);
-        else StartSimulation_ServerRpc(buildName);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void StartSimulation_ServerRpc(string buildName) => StartSimulation_Server(buildName);
-
-    private void StartSimulation_Server(string buildName)
-    {
-        // 1) zorg dat alles onder tabletop buildRoot zit
-        FixAllPlaceables_Server();
-
-
-        // 2) JSON in memory
-        var json = _json.SaveToString(buildRoot, buildName);
-        if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] StartSimulation: empty JSON."); return; }
-        BuildClipboard.LastJson = json;
-        BuildClipboard.LastBuildName = buildName;
-
-        // 3) scene wissel
-        LoadSceneNetworked(simulationSceneName, PendingLoad.ToSimulation);
-    }
-
-    // =============== RETURN TO TABLETOP ===============
-    public void ReturnToTabletopButton(string buildName = "MyBuild")
-    {
-        if (IsServer) ReturnToTabletop_Server(buildName);
-        else ReturnToTabletop_ServerRpc(buildName);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void ReturnToTabletop_ServerRpc(string buildName) => ReturnToTabletop_Server(buildName);
-
-    private void ReturnToTabletop_Server(string buildName)
-    {
-        // 1) pak sim root en save current state
-        var simRoot = GameObject.FindWithTag(simulationRootTag)?.transform;
-        if (!simRoot) { Debug.LogError("[BuildManager] Return: Simulation root not found."); return; }
-
-        var json = _json.SaveToString(simRoot, buildName);
-        if (string.IsNullOrEmpty(json)) { Debug.LogError("[BuildManager] Return: empty JSON."); return; }
-        BuildClipboard.LastJson = json;
-        BuildClipboard.LastBuildName = buildName;
-
-        // 2) scene wissel terug
-        LoadSceneNetworked(tabletopSceneName, PendingLoad.ToTabletop);
-    }
-
-    // =============== SCENE HANDLING (SAFE MODE) ===============
-    private void LoadSceneNetworked(string sceneName, PendingLoad mode)
-    {
-        var nsm = NetworkManager.SceneManager;
-        if (nsm == null) { Debug.LogError("[BuildManager] No NetworkSceneManager."); return; }
-
-        // altijd de- en resubscriben (voorkomt dubbele handlers)
-        if (_subscribed)
+        // Slider (desktop / debug)
+        if (optionSlider != null)
         {
-            nsm.OnSceneEvent -= OnSceneEvent_Server;
-            _subscribed = false;
-        }
-        nsm.OnSceneEvent += OnSceneEvent_Server;
-        _subscribed = true;
+            optionSlider.wholeNumbers = true;
+            optionSlider.minValue = 0;
+            optionSlider.maxValue = maxIndex;
 
-        _pendingLoad = mode;
-        nsm.LoadScene(sceneName, LoadSceneMode.Single);
-    }
-
-    private void OnSceneEvent_Server(SceneEvent e)
-    {
-        if (!IsServer) return;
-        if (e.SceneEventType != SceneEventType.LoadComplete) return;
-
-        // unhook direct
-        if (_subscribed)
-        {
-            NetworkManager.SceneManager.OnSceneEvent -= OnSceneEvent_Server;
-            _subscribed = false;
+            optionSlider.onValueChanged.RemoveListener(OnOptionSliderChanged);
+            optionSlider.onValueChanged.AddListener(OnOptionSliderChanged);
         }
 
-        if (_pendingLoad == PendingLoad.ToSimulation && e.SceneName == simulationSceneName)
+        // XRKnob (VR)
+        if (optionKnob != null)
         {
-            HandleSimulationLoaded();
-            _pendingLoad = PendingLoad.None;
-        }
-        else if (_pendingLoad == PendingLoad.ToTabletop && e.SceneName == tabletopSceneName)
-        {
-            HandleTabletopLoaded();
-            _pendingLoad = PendingLoad.None;
+            optionKnob.onValueChange.RemoveListener(OnOptionKnobChanged);
+            optionKnob.onValueChange.AddListener(OnOptionKnobChanged);
+
+            SyncOptionKnobWithIndex(_lastActiveOptionIndex);
         }
     }
 
-    private void HandleSimulationLoaded()
+    private void OnOptionSliderChanged(float value)
     {
-        var simRootGO = GameObject.FindWithTag(simulationRootTag);
-        if (!simRootGO) { Debug.LogError($"[BuildManager] Sim root tag '{simulationRootTag}' not found."); return; }
-
-        // schaal de root (vereist NetworkTransform met Sync Scale)
-        var simRoot = simRootGO.transform;
-        simRoot.localScale = Vector3.one * simulationScale;
-        var nt = simRootGO.GetComponent<Unity.Netcode.Components.NetworkTransform>();
-        if (nt != null) nt.Teleport(simRoot.position, simRoot.rotation, simRoot.localScale);
-
-        var rootNO = simRootGO.GetComponent<NetworkObject>();
-        Debug.Log($"[BuildManager] Sim root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
-
-        if (!string.IsNullOrEmpty(BuildClipboard.LastJson) && prefabCatalog != null)
-        {
-            _json.LoadFromString(simRoot, BuildClipboard.LastJson, prefabCatalog, clearExisting: true);
-            Debug.Log($"[BuildManager] Simulation loaded '{BuildClipboard.LastBuildName}' @ x{simulationScale}");
-        }
-        else Debug.LogWarning("[BuildManager] Missing JSON or PrefabCatalog for simulation load.");
+        int index = Mathf.RoundToInt(value);
+        OnTabletopOptionChanged(index);
     }
 
-    private void HandleTabletopLoaded()
+    private void OnOptionKnobChanged(float knobValue)
     {
-        var tableRootGO = GameObject.FindWithTag(tabletopRootTag);
-        if (!tableRootGO) { Debug.LogError($"[BuildManager] Tabletop root tag '{tabletopRootTag}' not found."); return; }
+        if (_updatingOptionKnobFromCode)
+            return;
 
-        var tableRoot = tableRootGO.transform;
-        tableRoot.localScale = Vector3.one; // tabletop = 1
+        int maxIndex = (tabletopOptions != null && tabletopOptions.Length > 0)
+            ? tabletopOptions.Length - 1
+            : 0;
 
-        var rootNO = tableRootGO.GetComponent<NetworkObject>();
-        Debug.Log($"[BuildManager] Tabletop root found. NO? {rootNO != null}, IsSpawned? {rootNO && rootNO.IsSpawned}");
-
-        if (!string.IsNullOrEmpty(BuildClipboard.LastJson) && prefabCatalog != null)
+        if (maxIndex <= 0)
         {
-            _json.LoadFromString(tableRoot, BuildClipboard.LastJson, prefabCatalog, clearExisting: true);
-            Debug.Log($"[BuildManager] Tabletop reloaded '{BuildClipboard.LastBuildName}'.");
-        }
-        else Debug.LogWarning("[BuildManager] Missing JSON or PrefabCatalog for tabletop load.");
-    }
-
-    // =============== RE-PARENT ===============
-    private void FixAllPlaceables_Server()
-    {
-        if (!buildRoot)
-        {
-            Debug.LogError("[BuildManager] buildRoot is null.");
+            OnTabletopOptionChanged(0);
             return;
         }
 
-        var buildRootNO = buildRoot.GetComponent<NetworkObject>();
-        var placeables = GameObject.FindGameObjectsWithTag("Placeable");
-        foreach (var go in placeables)
-        {
-            if (!go) continue;
+        // 0..1 → 0..maxIndex
+        float idxFloat = knobValue * maxIndex;
+        int index = Mathf.RoundToInt(idxFloat);
+        index = Mathf.Clamp(index, 0, maxIndex);
 
-            if (go.TryGetComponent(out NetworkObject childNO))
+        OnTabletopOptionChanged(index);
+    }
+
+    private void SyncOptionKnobWithIndex(int index)
+    {
+        if (optionKnob == null || tabletopOptions == null || tabletopOptions.Length <= 1)
+        {
+            if (optionKnob != null)
             {
-                if (buildRootNO != null)
-                {
-                    if (!childNO.TrySetParent(buildRootNO, worldPositionStays: true))
-                        Debug.LogWarning($"[BuildManager] TrySetParent failed for {go.name}");
-                }
-                else go.transform.SetParent(buildRoot, worldPositionStays: true);
+                _updatingOptionKnobFromCode = true;
+                optionKnob.value = 0f;
+                _updatingOptionKnobFromCode = false;
             }
-            else go.transform.SetParent(buildRoot, worldPositionStays: true);
+            return;
         }
 
+        int maxIndex = tabletopOptions.Length - 1;
+        float normalized = Mathf.Clamp01(index / (float)maxIndex);
+
+        _updatingOptionKnobFromCode = true;
+        optionKnob.value = normalized;
+        _updatingOptionKnobFromCode = false;
+    }
+
+    // ============================================================
+    //  UI ENTRY POINTS
+    // ============================================================
+
+    public void StartSimulation(string buildName = "MyBuild")
+    {
+        Debug.Log("[BuildManager] StartSimulation UI call");
+
+        if (tabletopRoot == null)
+        {
+            Debug.LogError("[BuildManager] tabletopRoot is NULL. Sleep TabletopBuildRoot in de inspector!");
+            return;
+        }
+
+        // 0) cache ALLE originele placeables (los in de scene, NIET clones)
+        CacheOriginalPlaceables();
+
+        // Huidige actieve optie-index gebruiken (komt uit slider/knob via OnTabletopOptionChanged)
+        int activeIndex = _lastActiveOptionIndex;
+
+        // 1) JSON snapshot maken
+        string json = jsonManager.CreateSnapshotJSON(tabletopRoot, buildName, activeIndex);
+        _lastActiveOptionIndex = activeIndex;
+        Debug.Log($"[BuildManager] StartSimulation → lastActiveOptionIndex = {_lastActiveOptionIndex}");
+
+        string fileName = SaveSystem.MakeTimestampedName(buildName);
+        SaveSystem.SaveJson(fileName, json);
+        Debug.Log($"[BuildManager] Snapshot saved: {fileName}.json");
+
+        // Snapshot van de snapshotCamera opslaan met dezelfde basename
+        SaveSnapshotPNG(fileName);
+
+        // 2) Clones maken in TABLETOP (onder tabletopRoot)
+        CreateClones();
+
+        // 3) Originelen verbergen
+        SetOriginalsActive(false);
+
+        // 4) Scene wisselen naar Simulation (via netcode als die aan staat)
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.SceneManager != null && nm.IsListening)
+            nm.SceneManager.LoadScene(simulationSceneName, LoadSceneMode.Single);
+        else
+            SceneManager.LoadScene(simulationSceneName, LoadSceneMode.Single);
+    }
+
+    public void ReturnToTabletop()
+    {
+        Debug.Log("[BuildManager] ReturnToTabletop UI call");
+
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.SceneManager != null && nm.IsListening)
+        {
+            nm.SceneManager.LoadScene(tabletopSceneName, LoadSceneMode.Single);
+        }
+        else
+        {
+            SceneManager.LoadScene(tabletopSceneName, LoadSceneMode.Single);
+        }
+    }
+
+    // ============================================================
+    //  CLONES & ORIGINALS
+    // ============================================================
+
+    private void CreateClones()
+    {
+        var originals = GameObject.FindGameObjectsWithTag("Placeable");
+        int count = 0;
+
+        foreach (var orig in originals)
+        {
+            if (orig == null) continue;
+
+            // safety: sla eventuele oude clones over
+            if (orig.GetComponent<SimCloneMarker>() != null)
+                continue;
+
+            GameObject clone = Instantiate(orig);
+            clone.name = orig.name + "_SimClone";
+
+            // clones zijn puur visueel, dus eigen tag
+            clone.tag = "SimClone";
+
+            // onder tabletopRoot hangen (in tabletop scene)
+            clone.transform.SetParent(tabletopRoot, worldPositionStays: true);
+
+            // Netcode-component weghalen
+            var no = clone.GetComponent<NetworkObject>();
+            if (no) Destroy(no);
+
+            // XR interactables uit
+            foreach (var b in clone.GetComponentsInChildren<MonoBehaviour>())
+            {
+                if (b == null) continue;
+                string t = b.GetType().Name;
+                if (t.Contains("Grab") || t.Contains("Socket") || t.Contains("Interactable"))
+                    b.enabled = false;
+            }
+
+            if (clone.GetComponent<SimCloneMarker>() == null)
+                clone.AddComponent<SimCloneMarker>();
+
+            count++;
+        }
+
+        Debug.Log($"[BuildManager] CreateClones: created {count} clone(s)");
+    }
+
+    private void SetOriginalsActive(bool active)
+    {
+        int toggled = 0;
+
+        // loop van achter naar voren, dan kunnen we nulls uit de lijst halen
+        for (int i = _originalPlaceables.Count - 1; i >= 0; i--)
+        {
+            var go = _originalPlaceables[i];
+
+            if (go == null)
+            {
+                // object is misschien vernietigd, haal uit de lijst
+                _originalPlaceables.RemoveAt(i);
+                continue;
+            }
+
+            go.SetActive(active);
+            toggled++;
+        }
+
+        Debug.Log($"[BuildManager] SetOriginalsActive({active}) → {toggled} gecachte originele Placeable(s) gezet.");
+    }
+
+    // ============================================================
+    //  SCENE LOADED CALLBACK
+    // ============================================================
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name == simulationSceneName)
+        {
+            SimulationLoaded();
+        }
+        else if (scene.name == tabletopSceneName)
+        {
+            TabletopLoaded();
+        }
+    }
+
+    // ------------------------------------------------------------
+
+    private void SimulationLoaded()
+    {
+        Debug.Log("[BuildManager] SimulationLoaded");
+
+        // 1) Zorg dat ALLE clones onder tabletopRoot hangen (voor de zekerheid)
+        if (tabletopRoot != null)
+        {
+            var clones = GameObject.FindGameObjectsWithTag("SimClone");
+            foreach (var c in clones)
+            {
+                if (c == null) continue;
+                c.transform.SetParent(tabletopRoot, true);
+            }
+            Debug.Log($"[BuildManager] Reparented {clones.Length} SimClone(s) onder {tabletopRoot.name}");
+
+            // 2) HELE tabletopRoot schalen → omgeving + opties + clones mee
+            tabletopRoot.localScale = Vector3.one * simulationScale;
+            Debug.Log("[BuildManager] tabletopRoot scaled x" + simulationScale);
+        }
+
+        // 3) Simulation-opties activeren
+        int idx = _lastActiveOptionIndex;
+
+        if (simulationOptions != null && simulationOptions.Length > 0)
+        {
+            idx = Mathf.Clamp(idx, 0, simulationOptions.Length - 1);
+
+            for (int i = 0; i < simulationOptions.Length; i++)
+                if (simulationOptions[i] != null)
+                    simulationOptions[i].SetActive(i == idx);
+        }
+    }
+
+    private void TabletopLoaded()
+    {
+        Debug.Log("[BuildManager] TabletopLoaded");
+
+        RebindTabletopRefs();
+        InitOptionsUI();
+
+        if (tabletopOptions != null && tabletopOptions.Length > 0)
+        {
+            int idx = Mathf.Clamp(_lastActiveOptionIndex, 0, tabletopOptions.Length - 1);
+            OnTabletopOptionChanged(idx);
+            Debug.Log($"[BuildManager] TabletopLoaded → optie/index hersteld naar {idx}");
+        }
+
+        // 1) schaal resetten
+        if (tabletopRoot != null)
+            tabletopRoot.localScale = Vector3.one;
+
+        // 2) clones opruimen
+        var clones = GameObject.FindGameObjectsWithTag("SimClone");
+        foreach (var c in clones)
+            if (c != null) Destroy(c);
+
+        // 3) originelen weer zichtbaar
+        SetOriginalsActive(true);
+
+        Debug.Log("[BuildManager] Tabletop restored (clones weg, originelen actief).");
+    }
+
+    // ============================================================
+    //  UI: BACK TO TABLETOP BUTTON
+    // ============================================================
+    public void OnBackToTabletopButton()
+    {
+        Debug.Log("[BuildManager] Back to Tabletop button pressed");
+
+        // Originelen weer zichtbaar maken
+        SetOriginalsActive(true);
+
+        // Schaal resetten
+        if (tabletopRoot != null)
+            tabletopRoot.localScale = Vector3.one;
+
+        // Clones verwijderen
+        var clones = GameObject.FindGameObjectsWithTag("SimClone");
+        foreach (var c in clones)
+            if (c != null) Destroy(c);
+
+        Debug.Log("[BuildManager] Clones removed, originals restored");
+
+        // Scene terugladen (via netcode indien actief)
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.SceneManager != null && nm.IsListening)
+        {
+            nm.SceneManager.LoadScene(tabletopSceneName, LoadSceneMode.Single);
+        }
+        else
+        {
+            SceneManager.LoadScene(tabletopSceneName, LoadSceneMode.Single);
+        }
+    }
+
+    private void CacheOriginalPlaceables()
+    {
+        _originalPlaceables.Clear();
+
+        var all = GameObject.FindGameObjectsWithTag("Placeable");
+        int cached = 0;
+
+        foreach (var go in all)
+        {
+            if (go == null) continue;
+
+            // clones (voor de zekerheid) overslaan
+            if (go.GetComponent<SimCloneMarker>() != null)
+                continue;
+
+            _originalPlaceables.Add(go);
+            cached++;
+        }
+
+        Debug.Log($"[BuildManager] CacheOriginalPlaceables: cached {cached} originele Placeable(s).");
+    }
+
+    public void OnTabletopOptionChanged(int index)
+    {
+        if (tabletopOptions == null || tabletopOptions.Length == 0)
+        {
+            Debug.LogWarning("[BuildManager] Geen tabletopOptions ingesteld.");
+            return;
+        }
+
+        int clamped = Mathf.Clamp(index, 0, tabletopOptions.Length - 1);
+        _lastActiveOptionIndex = clamped;
+
+        for (int i = 0; i < tabletopOptions.Length; i++)
+        {
+            if (tabletopOptions[i] != null)
+                tabletopOptions[i].SetActive(i == clamped);
+        }
+
+        // Slider in sync houden
+        if (optionSlider != null)
+            optionSlider.SetValueWithoutNotify(clamped);
+
+        // Knob in sync houden
+        SyncOptionKnobWithIndex(clamped);
+
+        Debug.Log($"[BuildManager] Tabletop optie {clamped} geactiveerd.");
     }
 
     private string SaveSnapshotPNG(string baseFileName)
@@ -303,7 +496,7 @@ public class BuildManager : NetworkBehaviour
         RenderTexture.active = null;
 
         // Schrijf PNG naar Saves-folder
-        string folder = Path.Combine(Application.persistentDataPath, "Saves");
+        string folder = Path.Combine(UnityEngine.Application.persistentDataPath, "Saves");
         if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, baseFileName + ".png");
 
@@ -313,6 +506,4 @@ public class BuildManager : NetworkBehaviour
         Debug.Log($"[BuildManager] Snapshot saved → {path}");
         return path;
     }
-
-
 }

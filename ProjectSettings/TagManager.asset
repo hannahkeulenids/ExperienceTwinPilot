@@ -12,6 +12,10 @@ TagManager:
   - Placeable
   - SimulationBuildRoot
   - TabletopBuildRoot
+  - SnapshotCamera
+  - TabletopRoot
+  - SimulationObjHolder
+  - SimClone
   layers:
   - Default
   - TransparentFX

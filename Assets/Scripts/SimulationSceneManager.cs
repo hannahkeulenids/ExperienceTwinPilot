@@ -11,14 +11,17 @@ public class SimulationSceneManager : NetworkBehaviour
     public void BackToTabletop()
     {
 
-        if (IsServer)
+
+        Debug.Log("[SimulationSceneManager] Terug naar tabletop scene...");
+        var nsm = NetworkManager.SceneManager;
+
+        if (nsm == null)
         {
-            LoadTabletop_Server();
+            Debug.LogError("[SimulationSceneManager] Geen NetworkSceneManager gevonden!");
+            return;
         }
-        else
-        {
-            BackToTabletop_ServerRpc();
-        }
+
+        nsm.LoadScene(tabletopSceneName, LoadSceneMode.Single);
     }
 
     [ServerRpc(RequireOwnership = false)]
