@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System;
 using System.IO;
 using UnityEngine.XR.Content.Interaction; // XRKnob
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+
 
 public class BuildManager : MonoBehaviour
 {
@@ -383,6 +386,9 @@ public class BuildManager : MonoBehaviour
         // 3) originelen weer zichtbaar
         SetOriginalsActive(true);
 
+        // 3) HIER: alle XRGrabInteractables opnieuw koppelen aan de manager
+        RebindInteractionManagers();
+
         Debug.Log("[BuildManager] Tabletop restored (clones weg, originelen actief).");
     }
 
@@ -467,6 +473,35 @@ public class BuildManager : MonoBehaviour
 
         Debug.Log($"[BuildManager] Tabletop optie {clamped} geactiveerd.");
     }
+
+    private void RebindInteractionManagers()
+    {
+        // Zoek de actieve XRInteractionManager in de huidige scene
+        var manager = FindObjectOfType<XRInteractionManager>();
+        if (manager == null)
+        {
+            Debug.LogError("[BuildManager] RebindInteractionManagers: geen XRInteractionManager gevonden!");
+            return;
+        }
+
+        var interactables = FindObjectsOfType<XRBaseInteractable>(true);
+        int rebound = 0;
+
+        foreach (var ia in interactables)
+        {
+            if (ia == null) continue;
+
+            // Alles wat 'Missing' of null is, koppelen we opnieuw
+            if (ia.interactionManager == null)
+            {
+                ia.interactionManager = manager;
+                rebound++;
+            }
+        }
+
+        Debug.Log($"[BuildManager] RebindInteractionManagers: {rebound} interactables opnieuw gekoppeld aan '{manager.name}'.");
+    }
+
 
     private string SaveSnapshotPNG(string baseFileName)
     {

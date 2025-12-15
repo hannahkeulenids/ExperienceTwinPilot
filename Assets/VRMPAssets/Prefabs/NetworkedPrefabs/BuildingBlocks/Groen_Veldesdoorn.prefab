@@ -187,6 +187,7 @@ GameObject:
   - component: {fileID: 1471418133301936582}
   - component: {fileID: 8770600284379928799}
   - component: {fileID: 6030753156212184617}
+  - component: {fileID: 1262949321284882420}
   m_Layer: 0
   m_Name: Groen_Veldesdoorn
   m_TagString: Untagged
@@ -331,7 +332,7 @@ MonoBehaviour:
   m_SmoothPosition: 0
   m_SmoothPositionAmount: 8
   m_TightenPosition: 0.1
-  m_TrackRotation: 1
+  m_TrackRotation: 0
   m_SmoothRotation: 0
   m_SmoothRotationAmount: 8
   m_TightenRotation: 0.1
@@ -549,6 +550,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Placeable
   prefabId: 5
+--- !u!114 &1262949321284882420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1546472452361269291}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb963138399f75d47814df5f17895b29, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::XRGridSnapper
+  useGrid: 0
+  gridOrigin: {fileID: 0}
+  cellSize: {x: 1, y: 1, z: 1}
+  snapXPosition: 0
+  snapYPosition: 1
+  snapZPosition: 0
+  fallbackMinY: 0
 --- !u!1 &3148861966553249804
 GameObject:
   m_ObjectHideFlags: 0

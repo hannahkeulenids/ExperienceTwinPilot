@@ -155,7 +155,7 @@ RectTransform:
   m_Father: {fileID: 951991911}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -4585,7 +4585,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &409127543
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8016,6 +8016,58 @@ RectTransform:
     type: 3}
   m_PrefabInstance: {fileID: 860004873}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &872732113
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 872732115}
+  - component: {fileID: 872732114}
+  m_Layer: 0
+  m_Name: GridSnapManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &872732114
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 872732113}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 060e85942890bf2439e877e4b3605b61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridSnapToggleManager
+  gridEnabled: 0
+  globalGridOrigin: {fileID: 2097742683}
+  globalCellSize: {x: 0.01, y: 0.01, z: 0.01}
+  globalSnapXPosition: 1
+  globalSnapYPosition: 1
+  globalSnapZPosition: 0
+  globalFallbackMinY: 0
+--- !u!4 &872732115
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 872732113}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.79912, y: 1.48199, z: 1.18444}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2097742683}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &874236337 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3754441934053033095, guid: 07f5a5a8f9e3f0e4bb51dd532e6afb40,
@@ -10291,15 +10343,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   allPrefabs:
-  - {fileID: 1471418133301936582, guid: d6b4b220e50c5344d86904f9f363a290, type: 3}
-  - {fileID: 1471418133301936582, guid: d6b4b220e50c5344d86904f9f363a290, type: 3}
-  - {fileID: 1471418133301936582, guid: d6b4b220e50c5344d86904f9f363a290, type: 3}
+  - {fileID: 1471418133301936582, guid: bf478557cbdb2e548a5b08dc88d644ff, type: 3}
+  - {fileID: 1471418133301936582, guid: 05e4cf6277ac3b9498221bb204d21e67, type: 3}
+  - {fileID: 1471418133301936582, guid: 8fc2a2c711ffaaf4a9a0e0aa5879828e, type: 3}
   - {fileID: 1471418133301936582, guid: a93407e537e333f42b30510962201065, type: 3}
   - {fileID: 1471418133301936582, guid: a93407e537e333f42b30510962201065, type: 3}
   - {fileID: 1471418133301936582, guid: a93407e537e333f42b30510962201065, type: 3}
   - {fileID: 1471418133301936582, guid: 9f5e95943c6743b4a9a25189681e90a9, type: 3}
-  - {fileID: 1471418133301936582, guid: 9f5e95943c6743b4a9a25189681e90a9, type: 3}
-  - {fileID: 1471418133301936582, guid: 9f5e95943c6743b4a9a25189681e90a9, type: 3}
+  - {fileID: 1471418133301936582, guid: e39b2b5ca5c41294d82c0a0a3a1b85ba, type: 3}
+  - {fileID: 1471418133301936582, guid: b3372be63dc87f94dae9a84081a25b48, type: 3}
   holders:
   - {fileID: 2116218717}
   - {fileID: 2037277376}
@@ -10774,7 +10826,7 @@ PrefabInstance:
     - target: {fileID: 5289182684458692540, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5289182684458692541, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
@@ -11362,7 +11414,7 @@ RectTransform:
   m_Father: {fileID: 238931509}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -12758,6 +12810,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 1489423092}
+    - targetCorrespondingSourceObject: {fileID: 8647664954492677990, guid: 0267a1d338db2bf4c9625e450bbaaad0,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1489423093}
   m_SourcePrefab: {fileID: 100100000, guid: 0267a1d338db2bf4c9625e450bbaaad0, type: 3}
 --- !u!1 &1489423091 stripped
 GameObject:
@@ -12778,6 +12834,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Id: bfc1c1e5-b8c8-40e0-b058-a2c26748921a
+--- !u!114 &1489423093
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1489423091}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bd428333b355ea4bb71d8c2d6d236e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DontDestroyXRManager
 --- !u!1 &1519829578
 GameObject:
   m_ObjectHideFlags: 0
@@ -12982,7 +13050,7 @@ PrefabInstance:
     - target: {fileID: 5289182684458692540, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5289182684458692541, guid: e5db301629853dd4a99835fa70099d79,
         type: 3}
@@ -15477,6 +15545,7 @@ GameObject:
   - component: {fileID: 2037534730}
   - component: {fileID: 2037534729}
   - component: {fileID: 2037534728}
+  - component: {fileID: 2037534734}
   m_Layer: 5
   m_Name: Snapping Button
   m_TagString: Untagged
@@ -15729,10 +15798,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 211937187}
-        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
-        m_MethodName: SetActive
-        m_Mode: 6
+      - m_Target: {fileID: 2037534734}
+        m_TargetAssemblyTypeName: GridSnapToggleButtonUI, Assembly-CSharp
+        m_MethodName: OnClickToggleSnapping
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -15749,6 +15818,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2037534726}
   m_CullTransparentMesh: 0
+--- !u!114 &2037534734
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2037534726}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9a4051d0d501b543a6e6221317b56db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridSnapToggleButtonUI
+  label: {fileID: 1037735925}
+  textWhenOff: Snapping aan
+  textWhenOn: Snapping uit
 --- !u!1 &2053763018
 GameObject:
   m_ObjectHideFlags: 0
@@ -16199,6 +16283,37 @@ RectTransform:
   m_AnchoredPosition: {x: -0.17, y: 0}
   m_SizeDelta: {x: 332.9, y: 502.1}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &2097742682
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2097742683}
+  m_Layer: 0
+  m_Name: Snappoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2097742683
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2097742682}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.101119995, y: -0.016989946, z: -0.31444}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 872732115}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2099150438
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17235,3 +17350,4 @@ SceneRoots:
   - {fileID: 1193256430}
   - {fileID: 2053763019}
   - {fileID: 35303122}
+  - {fileID: 872732115}

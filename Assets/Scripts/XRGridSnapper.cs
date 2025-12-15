@@ -1,75 +1,82 @@
-using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactables;
+﻿using UnityEngine;
 
 public class XRGridSnapper : MonoBehaviour
 {
-    [Header("Position Snapping")]
+    [Header("Enabled")]
     public bool useGrid = false;
-    public Vector3 size = Vector3.one;          // grid celgrootte per as
-    public Vector3 offset = Vector3.zero;       // verschuiving van het grid-center (zie gridOrigin)
-    public Transform gridOrigin = null;         // optioneel: bepaalt positie/rotatie van het grid
 
-    [Header("Rotation")]
-    public bool enableRotation = false;
+    [Header("Grid Settings")]
+    public Transform gridOrigin;          // wordt door de manager gezet
+    public Vector3 cellSize = Vector3.one;
+
+    [Tooltip("Op X-as naar grid snappen")]
+    public bool snapXPosition = false;
+
+    [Tooltip("Op Y-as naar grid snappen (hoogte)")]
+    public bool snapYPosition = true;
+
+    [Tooltip("Op Z-as naar grid snappen")]
+    public bool snapZPosition = false;
+
+    [Tooltip("Als er geen gridOrigin is, minimale Y-hoogte in world space")]
+    public float fallbackMinY = 0f;
+
+
+    private void Start()
+    {
+        // Haal globale settings op uit de manager
+        if (GridSnapToggleManager.Instance != null)
+            GridSnapToggleManager.Instance.ApplySettingsToSingle(this);
+    }
 
     private void LateUpdate()
     {
         if (!useGrid) return;
 
-        // --- POSITION ---
         Vector3 worldPos = transform.position;
 
-        if (gridOrigin)
+        if (gridOrigin != null)
         {
-            // Snap in LOCAL space van het grid, met offset als local verschuiving
-            Vector3 local = gridOrigin.InverseTransformPoint(worldPos) - offset;
+            // Snap in local space t.o.v. gridOrigin (bv. je tafel)
+            Vector3 local = gridOrigin.InverseTransformPoint(worldPos);
 
-            local = new Vector3(
-                Snap(local.x, size.x),
-                Snap(local.y, size.y),
-                Snap(local.z, size.z)
-            );
+            if (snapXPosition && cellSize.x > 0f)
+                local.x = Snap(local.x, cellSize.x);
 
-            worldPos = gridOrigin.TransformPoint(local + offset);
+            if (snapYPosition && cellSize.y > 0f)
+                local.y = Snap(local.y, cellSize.y);
+
+            if (snapZPosition && cellSize.z > 0f)
+                local.z = Snap(local.z, cellSize.z);
+
+            worldPos = gridOrigin.TransformPoint(local);
+
+            // Zorg dat hij nooit onder de tafel zakt
+            float minY = gridOrigin.position.y;
+            if (worldPos.y < minY)
+                worldPos.y = minY;
         }
         else
         {
-            // Snap in WORLD space; offset werkt ook in world space
-            Vector3 p = worldPos - offset;
+            // fallback: world space snapping
+            if (snapXPosition && cellSize.x > 0f)
+                worldPos.x = Snap(worldPos.x, cellSize.x);
 
-            p = new Vector3(
-                Snap(p.x, size.x),
-                Snap(p.y, size.y),
-                Snap(p.z, size.z)
-            );
+            if (snapYPosition && cellSize.y > 0f)
+                worldPos.y = Snap(worldPos.y, cellSize.y);
 
-            worldPos = p + offset;
+            if (snapZPosition && cellSize.z > 0f)
+                worldPos.z = Snap(worldPos.z, cellSize.z);
+
+            if (worldPos.y < fallbackMinY)
+                worldPos.y = fallbackMinY;
         }
 
-        // --- ROTATION ---
-        Quaternion worldRot = transform.rotation;
-
-        if (!enableRotation)
-        {
-            worldRot = Quaternion.identity;
-        }
-
-        // Toepassen (zonder fysica afhankelijkheid om het script simpel te houden)
-        transform.SetPositionAndRotation(worldPos, worldRot);
+        transform.position = worldPos;
     }
 
-    // Helpers
-    private static float Snap(float v, float step)
+    private static float Snap(float value, float step)
     {
-        if (step <= 0f) return v;
-        return Mathf.Round(v / step) * step;
-    }
-
-    private static float SnapAngle(float deg, float step)
-    {
-        if (step <= 0f) return deg;
-        deg = Mathf.Repeat(deg, 360f);
-        return Mathf.Round(deg / step) * step;
+        return Mathf.Round(value / step) * step;
     }
 }
