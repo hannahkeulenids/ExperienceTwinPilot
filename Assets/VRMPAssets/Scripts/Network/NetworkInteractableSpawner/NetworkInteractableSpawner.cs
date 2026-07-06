@@ -109,11 +109,20 @@ namespace UnityEngine.XR.Templates.VRMultiplayer
 
         bool CheckInteractablePosition()
         {
+            if (m_CurrentInteractable == null || spawnTransform == null)
+                return false;
+
             return Vector3.Distance(m_CurrentInteractable.transform.position, spawnTransform.position) > distanceToSpawnNew;
         }
 
         void CheckSpawn()
         {
+            if (spawnTransform == null)
+            {
+                Debug.LogWarning("spawnTransform is not assigned on " + gameObject.name);
+                return;
+            }
+
             if (m_SpawnCooldownTimer > 0)
             {
                 m_SpawnCooldownTimer -= Time.deltaTime;

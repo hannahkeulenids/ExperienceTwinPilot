@@ -87,8 +87,14 @@ namespace XRMultiplayer
 
         void UpdateRotation()
         {
-            Quaternion lookRot = Quaternion.LookRotation(m_Camera.transform.position - transform.position).normalized;
+            // Herstel camera reference als die null is
+            if (m_Camera == null)
+                m_Camera = Camera.main;
 
+            // Nog steeds null? Skip dan
+            if (m_Camera == null) return;
+
+            Quaternion lookRot = Quaternion.LookRotation(m_Camera.transform.position - transform.position).normalized;
             if (m_WorldUp)
             {
                 Vector3 offset = lookRot.eulerAngles;
@@ -96,7 +102,6 @@ namespace XRMultiplayer
                 offset.z = 0;
                 lookRot = Quaternion.Euler(offset);
             }
-
             transform.rotation = lookRot;
         }
 

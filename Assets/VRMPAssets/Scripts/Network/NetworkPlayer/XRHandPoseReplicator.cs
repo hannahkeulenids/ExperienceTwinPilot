@@ -320,8 +320,10 @@ namespace XRMultiplayer
             {
                 for (int j = 0; j < m_LocalHandFidelityOptions[0].fingerJoints[i].jointTransformReferences.Count; j++)
                 {
-                    m_FingerRotationsLeft[currentIdx++] =
-                        m_LocalHandFidelityOptions[0].fingerJoints[i].jointTransformReferences[j].jointTransform.eulerAngles;
+                    var jointTransformLeft = m_LocalHandFidelityOptions[0].fingerJoints[i].jointTransformReferences[j].jointTransform;
+                    if (jointTransformLeft != null)
+                        m_FingerRotationsLeft[currentIdx] = jointTransformLeft.eulerAngles;
+                    currentIdx++;
 
                 }
             }
@@ -331,8 +333,10 @@ namespace XRMultiplayer
             {
                 for (int j = 0; j < m_LocalHandFidelityOptions[1].fingerJoints[i].jointTransformReferences.Count; j++)
                 {
-                    m_FingerRotationsRight[currentIdx++] =
-                        m_LocalHandFidelityOptions[1].fingerJoints[i].jointTransformReferences[j].jointTransform.eulerAngles;
+                    var jointTransformRight = m_LocalHandFidelityOptions[1].fingerJoints[i].jointTransformReferences[j].jointTransform;
+                    if (jointTransformRight != null)
+                        m_FingerRotationsRight[currentIdx] = jointTransformRight.eulerAngles;
+                    currentIdx++;
                 }
             }
         }
